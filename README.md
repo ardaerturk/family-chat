@@ -11,6 +11,7 @@ This is an independent application, not an official ChatGPT client. It does not 
 - Discoverable passkeys with required device verification, backed by SimpleWebAuthn.
 - Separate histories for each account, with search, rename, pin, delete, export, edit, regenerate, and stop.
 - Allowlisted Azure deployments and configurable thinking effort.
+- **Take photo** in the attachment menu opens native camera capture on supported phones (rear camera preferred). Photos are oriented by the browser, resized to a maximum 2,048 px edge, and encoded as JPEG within the upload limit. Desktop browsers may show an image picker instead.
 - PDF, JPEG, PNG, WebP, and UTF-8 text/code uploads: 3 MB per file, four per message, 12 MB per conversation context.
 - Optional Azure realtime voice over WebRTC, plus device text-to-speech for reading replies.
 - Temporary text chats that are not written to application history.

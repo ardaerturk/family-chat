@@ -167,7 +167,7 @@ export default function ChatApp() {
     localStorage.setItem("family-theme", v);
   }
   function newChat(temp = false) {
-    if (busy) return;
+    if (busy || uploading) return;
     files.forEach((f) => api(`files/${f.id}`, "DELETE").catch(() => {}));
     setActive(null);
     setMessages([]);
@@ -180,7 +180,7 @@ export default function ChatApp() {
     setMoreMenu(false);
   }
   async function select(id: string) {
-    if (busy) return;
+    if (busy || uploading) return;
     setError("");
     try {
       const c = await api<Conversation>(`chats/${id}`);
@@ -196,8 +196,8 @@ export default function ChatApp() {
       setError(errorMessage(e));
     }
   }
-  async function upload(list: FileList) {
-    if (temporary || busy) return;
+  async function upload(list: FileList | File[], camera = false) {
+    if (temporary || busy || uploading) return;
     const selected = Array.from(list);
     if (selected.length + files.length > 4) {
       setError("Attach up to four files per message.");
@@ -206,7 +206,12 @@ export default function ChatApp() {
     setUploading(true);
     setError("");
     try {
-      for (const f of selected) {
+      for (const source of selected) {
+        const f = camera
+          ? await (
+              await import("@/lib/camera-photo")
+            ).prepareCameraPhoto(source)
+          : source;
         if (f.size > 3 * 1024 * 1024)
           throw new Error("Files can be up to 3 MB each.");
         const form = new FormData();
@@ -671,6 +676,7 @@ export default function ChatApp() {
           setText={setText}
           files={files}
           onFiles={upload}
+          onCameraPhoto={(photo) => upload([photo], true)}
           onRemove={removeFile}
           onSend={() => send()}
           onStop={() => abort.current?.abort()}

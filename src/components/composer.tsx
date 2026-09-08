@@ -8,6 +8,7 @@ import {
   X,
   FileText,
   Paperclip,
+  Camera,
   Image as ImageIcon,
 } from "lucide-react";
 import type { Attachment } from "@/lib/types";
@@ -17,6 +18,7 @@ export default function Composer({
   setText,
   files,
   onFiles,
+  onCameraPhoto,
   onRemove,
   onSend,
   onStop,
@@ -32,6 +34,7 @@ export default function Composer({
   setText: (s: string) => void;
   files: Attachment[];
   onFiles: (f: FileList) => void;
+  onCameraPhoto: (photo: File) => void;
   onRemove: (id: string) => void;
   onSend: () => void;
   onStop: () => void;
@@ -44,7 +47,8 @@ export default function Composer({
   onCancelEdit: () => void;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null),
-    fileRef = useRef<HTMLInputElement>(null);
+    fileRef = useRef<HTMLInputElement>(null),
+    cameraRef = useRef<HTMLInputElement>(null);
   const [menu, setMenu] = useState(false);
   useEffect(() => {
     const el = ref.current;
@@ -72,7 +76,7 @@ export default function Composer({
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => {
           e.preventDefault();
-          if (!busy && !temporary) onFiles(e.dataTransfer.files);
+          if (!busy && !uploading && !temporary) onFiles(e.dataTransfer.files);
         }}
       >
         {files.length || uploading ? (
@@ -141,11 +145,21 @@ export default function Composer({
             {menu ? (
               <>
                 <button
+                  type="button"
                   className="menu-dismiss"
                   aria-label="Close attachment menu"
                   onClick={() => setMenu(false)}
                 />
                 <div className="popover attachment-menu">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      cameraRef.current?.click();
+                      setMenu(false);
+                    }}
+                  >
+                    <Camera size={18} /> Take photo
+                  </button>
                   <button
                     type="button"
                     onClick={() => {
@@ -164,6 +178,21 @@ export default function Composer({
               </>
             ) : null}
           </div>
+          <input
+            ref={cameraRef}
+            className="sr-only"
+            tabIndex={-1}
+            type="file"
+            aria-label="Take a photo with your camera"
+            accept="image/*"
+            capture="environment"
+            disabled={busy || uploading || temporary || files.length >= 4}
+            onChange={(e) => {
+              const photo = e.target.files?.[0];
+              if (photo) onCameraPhoto(photo);
+              e.target.value = "";
+            }}
+          />
           <input
             ref={fileRef}
             className="sr-only"

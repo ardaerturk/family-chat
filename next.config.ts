@@ -13,7 +13,7 @@ const config: NextConfig = {
           { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" },
           {
             key: "Permissions-Policy",
-            value: "camera=(), microphone=(self), geolocation=(), payment=()",
+            value: "camera=(self), microphone=(self), geolocation=(), payment=()",
           },
         ],
       },
