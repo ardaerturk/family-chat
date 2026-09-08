@@ -1,5 +1,13 @@
 import "server-only";
 import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import {
+  DEVICE_SESSION_SECONDS,
+  needsSessionRenewal,
+  renewedSession,
+  sessionExpired,
+  type DeviceSession,
+} from "../session-policy";
 import {
   generateAuthenticationOptions,
   generateRegistrationOptions,
@@ -16,12 +24,7 @@ import { origin } from "./config";
 import * as db from "./store";
 import { body, fail, json } from "./http";
 import type { Person } from "../types";
-export type Session = {
-  userId: string;
-  createdAt: string;
-  expiresAt: number;
-  device: string;
-};
+export type Session = DeviceSession;
 export type Invite = {
   userId: string;
   name: string;
@@ -64,16 +67,39 @@ function setCookie(
     maxAge: age,
   });
 }
-export async function session(req: NextRequest) {
+export async function session(req: NextRequest, renew = true) {
   const raw = req.cookies.get(cookieName())?.value;
   if (!raw || raw.length > 100) fail(401, "Please unlock your chat.");
   const id = `session_${digest(raw)}`;
-  const s = await db.get<Session>("auth", id);
-  if (!s || s.value.expiresAt < Date.now())
+  let s = await db.get<Session>("auth", id);
+  const now = Date.now();
+  if (!s || sessionExpired(s.value, now))
     fail(401, "Your session has expired. Unlock with your passkey.");
   const person = await db.get<Person>("auth", `user_${s.value.userId}`);
   if (!person || person.value.disabled)
     fail(401, "This account is no longer active.");
+  if (renew && needsSessionRenewal(s.value, now)) {
+    const next = renewedSession(s.value, now);
+    try {
+      // Conditional replacement cannot recreate a concurrently revoked session.
+      await db.put("auth", id, next, s.etag);
+      s = { value: next, etag: s.etag };
+    } catch (error) {
+      if (![404, 412].includes(db.status(error) ?? 0)) throw error;
+      const current = await db.get<Session>("auth", id);
+      if (!current || sessionExpired(current.value, Date.now()))
+        fail(401, "This session has been revoked. Unlock with your passkey.");
+      s = current;
+    }
+    const jar = await cookies();
+    jar.set(cookieName(), raw, {
+      httpOnly: true,
+      secure: origin().startsWith("https:"),
+      sameSite: "strict",
+      path: "/",
+      maxAge: Math.max(0, Math.floor((s.value.expiresAt - Date.now()) / 1000)),
+    });
+  }
   return { person: person.value, session: s.value, id };
 }
 export async function owner(req: NextRequest) {
@@ -89,7 +115,8 @@ async function setSession(req: NextRequest, userId: string) {
   const session: Session = {
     userId,
     createdAt: new Date(now).toISOString(),
-    expiresAt: now + 30 * 86400 * 1000,
+    expiresAt: now + DEVICE_SESSION_SECONDS * 1000,
+    renewedAt: now,
     device: (req.headers.get("user-agent") || "Browser").slice(0, 240),
   };
   const previous = (await db.list<Session>("auth", "session_"))
@@ -98,7 +125,7 @@ async function setSession(req: NextRequest, userId: string) {
   for (const old of previous.slice(19)) await db.remove("auth", old.id);
   await db.create("auth", `session_${digest(raw)}`, session);
   const res = json({ ok: true });
-  setCookie(res, raw, 30 * 86400);
+  setCookie(res, raw, DEVICE_SESSION_SECONDS);
   setCookie(res, "", 0, "challenge");
   return res;
 }
@@ -309,7 +336,7 @@ export async function loginVerify(req: NextRequest) {
 }
 export async function logout(req: NextRequest) {
   try {
-    const s = await session(req);
+    const s = await session(req, false);
     await db.remove("auth", s.id);
   } catch {}
   const res = json({ ok: true });

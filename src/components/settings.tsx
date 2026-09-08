@@ -277,7 +277,7 @@ export default function Settings({
                   </strong>
                   <p>
                     Signed in {new Date(s.createdAt).toLocaleDateString()} ·
-                    30-day session
+                    Trusted device
                   </p>
                 </div>
                 <button
@@ -300,9 +300,10 @@ export default function Settings({
               <div>
                 <strong>Private by design</strong>
                 <p>
-                  Only invited people can join. Your chats are separate.
-                  Sessions expire after 30 days. Lost access? Ask the owner for
-                  a recovery invitation.
+                  Only invited people can join. Your chats are separate. You
+                  stay signed in while you use this device. After a year without
+                  using it, unlock again. Lost access? Ask the owner for a
+                  recovery invitation.
                 </p>
               </div>
             </div>
