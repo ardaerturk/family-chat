@@ -1,0 +1,46 @@
+{
+  "name": "family-chat",
+  "version": "1.0.0",
+  "description": "An invitation-only, mobile-first PWA for Azure OpenAI.",
+  "main": "index.js",
+  "scripts": {
+    "dev": "next dev --hostname 0.0.0.0",
+    "build": "next build",
+    "start": "next start --hostname 0.0.0.0",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "tsx --test tests/*.test.ts",
+    "check": "npm run typecheck && npm run lint && npm test",
+    "bootstrap": "tsx --env-file=.env.local scripts/bootstrap.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@azure/data-tables": "^13.3.2",
+    "@azure/storage-blob": "^12.33.0",
+    "@simplewebauthn/browser": "^14.0.0",
+    "@simplewebauthn/server": "^14.0.1",
+    "lucide-react": "^1.43.0",
+    "next": "^16.3.4",
+    "openai": "^7.10.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "server-only": "^0.0.1",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^26.5.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.3.4",
+    "tsx": "^4.23.13",
+    "typescript": "^6.0.3"
+  },
+  "private": true,
+  "type": "module"
+}
