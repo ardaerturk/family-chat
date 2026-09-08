@@ -29,7 +29,7 @@ export default function Welcome({
     <main className="welcome">
       <header className="welcome-header">
         <Mark size={25} />
-        <span>Family Chat</span>
+        <span>ChatGPT</span>
       </header>
       <section className="welcome-main">
         <div className="welcome-mark">
@@ -40,7 +40,7 @@ export default function Welcome({
         </h1>
         <p>
           {invite
-            ? "You’ve been invited to Family Chat. Save a passkey to make this space yours."
+            ? "You’ve been invited to ChatGPT. Save a passkey to make this space yours."
             : "Ask a question. Work through an idea.\nPick up right where you left off."}
         </p>
         <button
@@ -80,8 +80,7 @@ export default function Welcome({
           </p>
         </details>
         <small>
-          Independent app powered by your family’s Azure AI. Not affiliated with
-          ChatGPT.
+          Your private Azure-powered chat.
         </small>
       </footer>
     </main>

@@ -1,4 +1,4 @@
-# Family Chat
+# ChatGPT · Private Azure client
 
 A private, mobile-first PWA for Azure OpenAI. A familiar chat interface with individual passkeys, invitation-only access, model selection, streaming replies, attachments, and synchronized conversations.
 
@@ -90,3 +90,7 @@ npm audit --audit-level=high
 ```
 
 The unit suite covers authenticated encryption and token generation. Before a production release, also run real-browser passkey enrollment/login/replay checks, a two-account authorization and revocation test, live Azure text and attachment requests, secure-cookie and CSP inspection, mobile/desktop rendering, and voice negotiation. Use disposable identities and delete test data after verification. Test fixtures, production secrets, activation links, deployment addresses, and private QA outputs do not belong in the repository.
+
+## Branding assets
+
+The ChatGPT/OpenAI knot mark is reproduced for the personal client interface. It is not covered by this repository’s MIT license, and no endorsement by OpenAI is implied. SVG geometry source: [Lobe Icons](https://github.com/lobehub/lobe-icons/blob/master/packages/static-svg/icons/openai.svg).

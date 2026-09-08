@@ -230,8 +230,8 @@ export default function Settings({
               </div>
             </div>
             <div className="settings-about">
-              <strong>Family Chat</strong>
-              <p>Your private assistant, powered by Azure AI.</p>
+              <strong>ChatGPT</strong>
+              <p>Private Azure-powered client. Not affiliated with OpenAI.</p>
               <p>
                 Supports PDF, images, and text/code files up to 3 MB each. No
                 live web search or code execution. Voice is a separate
@@ -381,7 +381,7 @@ export default function Settings({
                     onClick={() =>
                       act(async () =>
                         navigator.share({
-                          title: "Join Family Chat",
+                          title: "Join ChatGPT",
                           url: invite,
                         }),
                       )

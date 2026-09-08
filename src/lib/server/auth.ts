@@ -158,7 +158,7 @@ export async function registerOptions(req: NextRequest) {
   if (keys.length >= 10)
     fail(400, "You already have ten passkeys. Remove an old one first.");
   const options = await generateRegistrationOptions({
-    rpName: "Family Chat",
+    rpName: "ChatGPT",
     rpID: new URL(origin()).hostname,
     userID: new TextEncoder().encode(userId),
     userName: name,

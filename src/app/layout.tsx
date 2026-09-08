@@ -1,11 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 export const metadata: Metadata = {
-  title: "Family Chat",
+  title: "ChatGPT",
   description: "Your private AI conversations",
   manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, statusBarStyle: "default", title: "Chat" },
-  icons: { icon: "/icon-192.png", apple: "/icon-180.png" },
+  appleWebApp: { capable: true, statusBarStyle: "default", title: "ChatGPT" },
+  icons: { icon: "/chatgpt-192.png", apple: "/chatgpt-180.png" },
   robots: { index: false, follow: false },
 };
 export const viewport: Viewport = {

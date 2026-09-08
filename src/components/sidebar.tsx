@@ -61,7 +61,7 @@ export default function Sidebar({
         <div className="sidebar-brand">
           <div>
             <Mark size={24} />
-            <span>Family Chat</span>
+            <span>ChatGPT</span>
           </div>
           <IconButton
             label="Close sidebar"

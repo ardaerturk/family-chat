@@ -1,5 +1,5 @@
-const CACHE='family-chat-shell-v1';
-const SAFE=['/offline.html','/icon-192.png','/icon-512.png','/manifest.webmanifest'];
+const CACHE='chatgpt-shell-v2';
+const SAFE=['/offline.html','/chatgpt-192.png','/chatgpt-512.png','/manifest.webmanifest'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SAFE)));self.skipWaiting();});
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim()));});
 // Never cache the app document, private API responses, messages, or uploaded files.
