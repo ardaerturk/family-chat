@@ -1415,12 +1415,108 @@ svg {
     font-size: 32px;
   }
 }
-@media (max-width: 767px) {
+/* The scrollable conversation lives inside a stable viewport-sized app shell. */
+html:has(.app-shell),
+body:has(.app-shell) {
+  overflow: hidden;
+}
+.app-shell {
+  position: fixed;
+  top: var(--viewport-top, 0px);
+  left: 0;
+}
+.chat-main,
+.empty-state {
+  min-height: 0;
+}
+.empty-state {
+  overflow-y: auto;
+}
+.model-heading {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.keyboard-dismiss {
+  display: none;
+}
+.scroll-bottom {
+  bottom: calc(var(--composer-height, 150px) + 12px);
+  z-index: 10;
+}
+.message-scroller {
+  overflow-anchor: none;
+}
+button {
+  -webkit-user-select: none;
+  user-select: none;
+}
+.sheet-grabber {
+  display: none;
+}
+.sheet-actions {
+  overflow-y: auto;
+  min-height: 0;
+}
+@keyframes sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (max-width: 767px),
+  (hover: none) and (pointer: coarse) and (max-height: 500px) {
+  :root {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
   .mobile-only {
     display: inline-flex;
   }
   .desktop-only {
     display: none;
+  }
+  .icon-button,
+  .header-right .icon-button,
+  .composer-toolbar .icon-button {
+    width: 44px;
+    height: 44px;
+  }
+  .icon-button,
+  .sidebar-action,
+  .history-item,
+  .suggestions button {
+    transition:
+      background-color 120ms ease,
+      transform 120ms ease;
+  }
+  .icon-button:active:not(:disabled) {
+    transform: scale(0.92);
+  }
+  .sidebar-action:active,
+  .history-item:active,
+  .suggestions button:active {
+    background: var(--hover);
+  }
+  /* No iOS input zoom; pinch zoom remains available. */
+  input,
+  textarea,
+  select,
+  .search-box input,
+  .reasoning-option select,
+  .settings-row select,
+  .simple-form input,
+  .invite-form input,
+  .invitation-result input {
+    font-size: 16px;
   }
   .welcome {
     padding: calc(22px + env(safe-area-inset-top)) 24px
@@ -1437,51 +1533,47 @@ svg {
     padding: 42px 0 50px;
   }
   .welcome-main > p {
-    font-size: 14px;
+    font-size: 16px;
     margin-top: 18px;
-  }
-  .welcome-mark {
-    margin-bottom: 24px;
   }
   .welcome-cta {
     width: 100%;
     max-width: 310px;
-    font-size: 14px;
+    font-size: 16px;
   }
   .welcome-footer {
-    font-size: 11px;
-    gap: 10px;
+    font-size: 12px;
   }
   .welcome-footer small {
-    font-size: 9px;
-  }
-  .private-note {
-    margin-top: 30px;
+    font-size: 10px;
   }
   .sidebar {
-    position: fixed;
+    position: absolute;
     left: 0;
     top: 0;
     bottom: 0;
     z-index: 80;
-    width: min(310px, 85vw);
-    padding: calc(14px + env(safe-area-inset-top)) 12px
+    width: min(340px, 88vw);
+    padding: calc(12px + env(safe-area-inset-top)) 12px
       max(12px, env(safe-area-inset-bottom));
+    border-radius: 0 24px 24px 0;
     transform: translateX(-100%);
-    transition: transform 0.2s ease;
+    transition: transform 260ms cubic-bezier(0.22, 0.8, 0.25, 1);
   }
   .sidebar.open {
     transform: translateX(0);
   }
   .sidebar-backdrop {
-    position: fixed;
+    position: absolute;
     inset: 0;
     z-index: 70;
-    background: #0006;
+    background: #0005;
     display: block;
     visibility: hidden;
     opacity: 0;
-    transition: opacity 0.2s;
+    transition:
+      opacity 220ms ease,
+      visibility 220ms;
   }
   .sidebar-backdrop.visible {
     visibility: visible;
@@ -1489,199 +1581,469 @@ svg {
   }
   .sidebar-brand {
     padding-left: 12px;
-    margin-bottom: 13px;
+    margin-bottom: 20px;
   }
-  .sidebar-action,
+  .sidebar-brand > div {
+    font-size: 18px;
+  }
+  .sidebar-action {
+    font-size: 16px;
+    height: 48px;
+  }
+  .search-box {
+    background: var(--hover);
+    border-radius: 12px;
+    margin: 12px 4px 0;
+    padding: 8px 12px;
+  }
+  .search-box kbd {
+    display: none;
+  }
   .search-box input {
-    font-size: 15px;
+    height: 28px;
+  }
+  .chat-history {
+    margin-top: 12px;
+    overscroll-behavior-y: contain;
+  }
+  .chat-history h3 {
+    font-size: 12px;
+    padding-top: 20px;
   }
   .history-item {
-    font-size: 14px;
-    padding: 12px;
-    min-height: 44px;
+    font-size: 16px;
+    min-height: 48px;
   }
   .profile-button {
-    padding: 12px 9px;
+    padding: 14px 9px;
   }
   .profile-button strong {
-    font-size: 14px;
+    font-size: 16px;
+  }
+  .profile-button small {
+    font-size: 12px;
   }
   .chat-header {
-    height: calc(62px + env(safe-area-inset-top));
-    padding: env(safe-area-inset-top) 10px 0;
-    gap: 2px;
-  }
-  .chat-header > .icon-button {
-    width: 44px;
-    height: 44px;
+    height: calc(64px + env(safe-area-inset-top));
+    padding: env(safe-area-inset-top) max(8px, env(safe-area-inset-right)) 0
+      max(8px, env(safe-area-inset-left));
+    gap: 4px;
+    background: var(--bg);
   }
   .model-picker {
+    min-width: 0;
     margin-right: auto;
   }
   .model-trigger {
-    font-size: 17px;
-    padding: 8px 4px;
     gap: 5px;
+    padding: 5px 7px;
+    min-height: 48px;
+  }
+  .model-heading {
+    min-width: 0;
+    line-height: 1.25;
+    gap: 3px;
+  }
+  .model-heading .app-name {
+    font-size: 17px;
+    font-weight: 650;
     letter-spacing: -0.4px;
   }
+  .model-name {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted);
+    letter-spacing: 0;
+  }
   .model-trigger > svg {
-    width: 14px;
+    width: 13px;
   }
   .header-right {
     gap: 0;
   }
   .header-right .icon-button {
-    width: 36px;
-    height: 44px;
-  }
-  .model-menu {
-    left: -38px;
-    width: min(320px, calc(100vw - 32px));
-    top: 47px;
+    color: var(--text);
   }
   .temporary-label {
     display: none;
   }
   .empty-state {
-    padding: 10px 22px 47px;
-  }
-  .empty-state h1 {
-    font-size: 27px;
-    letter-spacing: -0.9px;
-    line-height: 1.35;
-    margin-bottom: 25px;
-  }
-  .suggestions {
-    gap: 9px;
-    max-width: 315px;
-  }
-  .suggestions button {
-    font-size: 11px;
-    padding: 9px 12px;
-    min-height: 38px;
-  }
-  .suggestions svg {
-    width: 15px;
-    height: 15px;
+    padding: 20px 24px 60px;
   }
   .empty-content {
-    margin-top: -20px;
+    width: 100%;
+  }
+  .empty-mark {
+    margin-bottom: 23px;
+  }
+  .empty-state h1 {
+    font-size: 28px;
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: -0.9px;
+    margin-bottom: 28px;
+  }
+  .suggestions {
+    gap: 10px;
+    max-width: 340px;
+    margin: 0 auto;
+  }
+  .suggestions button {
+    font-size: 13px;
+    min-height: 44px;
+    padding: 10px 13px;
+    color: var(--text);
+  }
+  .suggestions svg {
+    width: 17px;
+    height: 17px;
   }
   .composer-area {
-    padding: 0 12px max(9px, env(safe-area-inset-bottom));
+    padding: 8px max(10px, env(safe-area-inset-right))
+      max(10px, env(safe-area-inset-bottom))
+      max(10px, env(safe-area-inset-left));
+    background: var(--bg);
   }
   .composer {
-    border-radius: 25px;
-    padding: 13px 10px 8px;
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+    align-items: end;
+    gap: 0;
+    border-radius: 28px;
+    padding: 5px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+  }
+  .composer:focus-within {
+    border-color: var(--line);
   }
   .composer textarea {
-    font-size: 16px;
-    padding-left: 8px;
-    line-height: 1.55;
-    min-height: 31px;
+    grid-column: 2;
+    grid-row: 2;
+    align-self: center;
+    min-height: 42px;
+    max-height: min(180px, calc(var(--app-height, 100dvh) * 0.3));
+    font-size: 17px;
+    line-height: 24px;
+    padding: 9px 5px;
+    border-radius: 0;
+    overscroll-behavior-y: contain;
+    scroll-padding-block: 9px;
   }
   .composer-toolbar {
-    margin-top: 6px;
+    display: contents;
   }
-  .composer-toolbar .icon-button {
-    height: 38px;
-    width: 38px;
+  .attachment-menu-wrap {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .composer-right {
+    grid-column: 3;
+    grid-row: 2;
+    gap: 0;
+  }
+  .composer .send-button {
+    width: 44px;
+    height: 44px;
+    border: 4px solid var(--surface);
+  }
+  .composer .send-button:disabled {
+    opacity: 0.25;
   }
   .composer-disclaimer {
-    font-size: 9px;
-    padding-top: 8px;
-    letter-spacing: -0.05px;
+    display: none;
+  }
+  .composer-area:has(.edit-banner) {
+    padding-top: 4px;
+  }
+  .edit-banner {
+    font-size: 13px;
+  }
+  .edit-banner .icon-button {
+    height: 44px;
+    width: 44px;
+  }
+  .attachments {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    padding: 7px 5px 9px;
+    overscroll-behavior-x: contain;
+  }
+  .attachment {
+    max-width: 260px;
+  }
+  .attachment strong {
+    font-size: 13px;
+  }
+  .attachment small {
+    font-size: 11px;
+  }
+  .attachment .icon-button {
+    height: 44px;
+    width: 44px;
+    align-self: center;
+  }
+  html[data-keyboard="open"] .composer-area {
+    padding-bottom: 6px;
+  }
+  html[data-keyboard="open"] .keyboard-dismiss {
+    display: inline-flex;
+  }
+  html[data-keyboard="open"] .empty-state {
+    padding: 12px 20px;
+  }
+  html[data-keyboard="open"] .empty-mark,
+  html[data-keyboard="open"] .suggestions {
+    display: none;
+  }
+  html[data-keyboard="open"] .empty-state h1 {
+    margin: 0;
+    font-size: 24px;
+  }
+  html[data-keyboard="open"] .sidebar {
+    padding-bottom: 8px;
+  }
+  .message-scroller {
+    scrollbar-width: none;
   }
   .messages {
-    padding: 21px 20px 17px;
+    padding: 22px max(20px, env(safe-area-inset-right)) 12px
+      max(20px, env(safe-area-inset-left));
   }
   .message.user {
-    padding-left: 24px;
+    padding-left: 30px;
   }
   .user-bubble {
-    font-size: 15px;
-    padding: 10px 16px;
-    border-radius: 22px;
+    font-size: 17px;
+    line-height: 1.5;
+    padding: 11px 16px;
+    border-radius: 23px;
   }
   .message.assistant {
-    margin-top: 18px;
-    margin-bottom: 26px;
+    margin: 22px 0 28px;
   }
   .markdown {
-    font-size: 15px;
-    line-height: 1.85;
+    font-size: 17px;
+    line-height: 1.7;
   }
   .markdown h2 {
-    font-size: 20px;
+    font-size: 22px;
   }
   .markdown h3 {
-    font-size: 17px;
+    font-size: 19px;
   }
   .user-actions {
     opacity: 1;
   }
+  .message-actions {
+    gap: 0;
+    margin-left: -8px;
+  }
   .message-actions .icon-button {
-    width: 34px;
-    height: 34px;
+    width: 44px;
+    height: 44px;
+  }
+  .message-model {
+    font-size: 10px;
+  }
+  .message-file {
+    max-width: 260px;
+    font-size: 14px;
+  }
+  .scroll-bottom {
+    width: 44px;
+    height: 44px;
+  }
+  .scroll-bottom:active:not(:disabled) {
+    transform: translateX(-50%);
   }
   .chat-error {
     width: calc(100% - 24px);
-    font-size: 12px;
+    font-size: 13px;
+    margin-bottom: 0;
+    flex-shrink: 0;
   }
-  .modal {
-    width: calc(100% - 24px);
-    border-radius: 18px;
-    max-height: 88dvh;
+  .chat-error .icon-button {
+    width: 44px;
+    height: 44px;
+  }
+  .modal,
+  .settings-modal {
+    top: auto;
+    bottom: max(
+      0px,
+      calc(100% - var(--viewport-top, 0px) - var(--app-height, 100dvh))
+    );
+    margin: 0 auto;
+    width: 100%;
+    max-width: 600px;
+    max-height: calc(
+      var(--app-height, 100dvh) - env(safe-area-inset-top) - 12px
+    );
+    border: 0;
+    border-radius: 28px 28px 0 0;
+    box-shadow: 0 -8px 50px #0002;
+    animation: sheet-in 220ms cubic-bezier(0.22, 0.8, 0.25, 1);
+  }
+  .modal::backdrop {
+    background: #0005;
+    backdrop-filter: blur(2px);
   }
   .modal-inner {
-    max-height: 88dvh;
+    max-height: calc(
+      var(--app-height, 100dvh) - env(safe-area-inset-top) - 12px
+    );
+    padding-bottom: max(14px, env(safe-area-inset-bottom));
+  }
+  html[data-keyboard="open"] .modal-inner {
+    padding-bottom: 10px;
+  }
+  .sheet-grabber {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 24px;
+    min-height: 24px;
+    padding: 0;
+    touch-action: none;
+  }
+  .sheet-grabber span {
+    width: 36px;
+    height: 5px;
+    background: var(--muted);
+    opacity: 0.35;
+    border-radius: 10px;
   }
   .modal-header {
-    padding: 14px 16px 11px;
+    padding: 0 16px 12px 22px;
+    min-height: 56px;
   }
   .modal-header h2 {
-    font-size: 18px;
+    font-size: 20px;
+    font-weight: 650;
+    letter-spacing: -0.5px;
+  }
+  .modal-header .icon-button {
+    width: 44px;
+    height: 44px;
+    background: var(--surface);
+  }
+  .sheet-actions {
+    position: static;
+    width: auto;
+    padding: 10px 12px 2px;
+    overscroll-behavior-y: contain;
+  }
+  .sheet-actions > button:not(.model-option) {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    width: 100%;
+    min-height: 58px;
+    border-radius: 14px;
+    text-align: left;
+    padding: 14px 16px;
+    font-size: 17px;
+  }
+  .sheet-actions > button:active {
+    background: var(--surface);
+  }
+  .sheet-actions > button > svg {
+    width: 22px;
+    height: 22px;
+  }
+  .sheet-actions > p {
+    font-size: 12px;
+    padding: 12px 16px;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+  .model-option {
+    padding: 16px;
+    min-height: 76px;
+    border-radius: 14px;
+  }
+  .model-option[aria-pressed="true"] {
+    background: var(--surface);
+  }
+  .model-option strong {
+    font-size: 17px;
+    font-weight: 600;
+  }
+  .model-option span {
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .reasoning-option {
+    padding: 16px;
+    font-size: 15px;
+  }
+  .reasoning-option select {
+    min-height: 44px;
   }
   .settings-tabs {
-    padding: 11px 15px 0;
+    padding: 12px 18px;
+    gap: 4px;
+  }
+  .settings-tabs button {
+    flex: 1;
+    font-size: 15px;
+    min-height: 44px;
+    padding: 8px 12px;
   }
   .settings-content {
-    padding: 6px 18px 22px;
+    padding: 0 22px 18px;
+    overscroll-behavior-y: contain;
   }
   .settings-row {
     gap: 12px;
-    padding: 18px 0;
+    padding: 20px 0;
   }
   .settings-row strong {
-    font-size: 12px;
+    font-size: 15px;
   }
   .settings-row p {
-    font-size: 10px;
+    font-size: 13px;
+    line-height: 1.5;
   }
   .settings-row .secondary {
-    font-size: 11px;
-    padding: 8px 10px;
+    font-size: 14px;
+    padding: 10px 12px;
+    min-height: 44px;
   }
   .settings-row select {
-    font-size: 11px;
+    max-width: 125px;
+    min-height: 44px;
   }
   .settings-note {
-    padding: 13px;
-    gap: 9px;
+    padding: 16px;
+    gap: 10px;
   }
-  .settings-note p {
-    font-size: 10px;
+  .settings-note strong {
+    font-size: 14px;
+  }
+  .settings-note p,
+  .settings-about {
+    font-size: 13px;
   }
   .section-intro {
-    font-size: 12px;
+    font-size: 15px;
+  }
+  .section-heading {
+    font-size: 13px;
+  }
+  .text-button,
+  .person-actions button {
+    min-height: 44px;
+    font-size: 13px;
   }
   .invite-form input {
-    font-size: 16px;
     padding: 10px;
     max-width: 100%;
   }
   .invite-form .primary {
-    font-size: 12px;
+    font-size: 14px;
     padding: 10px 13px;
   }
   .person-actions {
@@ -1689,51 +2051,63 @@ svg {
     flex-wrap: wrap;
     justify-content: flex-end;
   }
-  .person-actions button {
-    font-size: 10px;
-  }
   .person-actions svg {
     display: none;
   }
-  .scroll-bottom {
-    bottom: 155px;
-  }
   .simple-form {
-    padding: 18px;
+    padding: 18px 22px;
+    overflow-y: auto;
   }
-  .simple-form input {
+  .simple-form .primary,
+  .simple-form .secondary {
+    min-height: 48px;
     font-size: 16px;
   }
   .voice-body {
-    padding: 30px 22px 24px;
+    padding: 24px 22px;
+    overflow-y: auto;
   }
   .voice-orb {
-    width: 145px;
-    height: 145px;
+    width: 130px;
+    height: 130px;
   }
   .voice-transcript {
-    font-size: 13px;
-  }
-  .message-file {
-    max-width: 230px;
+    font-size: 15px;
   }
 }
 @media (max-width: 360px) {
   .model-trigger {
-    font-size: 15px;
-  }
-  .header-right .icon-button {
-    width: 32px;
+    padding-inline: 0;
   }
   .empty-state h1 {
-    font-size: 24px;
+    font-size: 25px;
+  }
+  .suggestions {
+    gap: 8px;
   }
   .suggestions button {
-    font-size: 10px;
-    padding: 8px 10px;
+    padding: 10px;
+    font-size: 12px;
   }
   .welcome h1 {
     font-size: 33px;
+  }
+}
+@media (max-width: 767px) and (max-height: 480px),
+  (hover: none) and (pointer: coarse) and (max-height: 480px) {
+  .chat-header {
+    height: 52px;
+    padding-top: 0;
+  }
+  .empty-state {
+    padding: 10px 20px;
+  }
+  .empty-mark,
+  .suggestions {
+    display: none;
+  }
+  .empty-state h1 {
+    margin: 0;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -1743,16 +2117,5 @@ svg {
     animation: none !important;
     transition: none !important;
     scroll-behavior: auto !important;
-  }
-}
-
-@media (max-width: 767px) {
-  .header-right .icon-button {
-    width: 40px;
-    height: 44px;
-  }
-  .composer-toolbar .icon-button {
-    width: 40px;
-    height: 44px;
   }
 }

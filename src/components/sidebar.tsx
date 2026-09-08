@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import {
   Search,
   SquarePen,
@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import type { ConversationSummary, Person } from "@/lib/types";
 import { IconButton, Mark } from "./ui";
+import { useMobile } from "@/lib/mobile";
 export default function Sidebar({
   person,
   chats,
@@ -33,14 +34,42 @@ export default function Sidebar({
 }) {
   const [search, setSearch] = useState("");
   const [now] = useState(() => Date.now());
-  const [mobile, setMobile] = useState(false);
+  const mobile = useMobile();
+  const closeFromKey = useEffectEvent(onClose);
+  const panel = useRef<HTMLElement>(null);
+  const gesture = useRef<{ x: number; y: number } | null>(null);
   useEffect(() => {
-    const q = window.matchMedia("(max-width:767px)");
-    const update = () => setMobile(q.matches);
-    update();
-    q.addEventListener("change", update);
-    return () => q.removeEventListener("change", update);
-  }, []);
+    if (!open || !mobile) return;
+    const previous = document.activeElement;
+    const el = panel.current;
+    el?.querySelector<HTMLElement>("button")?.focus({ preventScroll: true });
+    function key(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeFromKey();
+      }
+      if (e.key !== "Tab" || !el) return;
+      const buttons = Array.from(
+        el.querySelectorAll<HTMLElement>("button:not(:disabled), input"),
+      );
+      const first = buttons[0],
+        last = buttons[buttons.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last?.focus();
+      }
+      if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first?.focus();
+      }
+    }
+    document.addEventListener("keydown", key);
+    return () => {
+      document.removeEventListener("keydown", key);
+      if (previous instanceof HTMLElement && previous.isConnected)
+        previous.focus({ preventScroll: true });
+    };
+  }, [open, mobile]);
   const filtered = chats.filter((c) =>
     c.title.toLocaleLowerCase().includes(search.toLocaleLowerCase()),
   );
@@ -54,9 +83,35 @@ export default function Sidebar({
         tabIndex={open ? 0 : -1}
       />
       <aside
+        ref={panel}
+        role={mobile && open ? "dialog" : undefined}
+        aria-modal={mobile && open ? true : undefined}
+        onTouchStart={(e) => {
+          if (!mobile || !open || e.touches.length !== 1) return;
+          gesture.current = {
+            x: e.touches[0].clientX,
+            y: e.touches[0].clientY,
+          };
+        }}
+        onTouchEnd={(e) => {
+          if (!gesture.current) return;
+          const start = gesture.current;
+          gesture.current = null;
+          const touch = e.changedTouches[0];
+          if (
+            touch &&
+            start.x - touch.clientX > 80 &&
+            Math.abs(start.y - touch.clientY) < 45
+          )
+            onClose();
+        }}
+        onTouchCancel={() => {
+          gesture.current = null;
+        }}
         className={`sidebar ${open ? "open" : ""}`}
         aria-label="Chat history"
         inert={!open && mobile ? true : undefined}
+        aria-hidden={!open && mobile ? true : undefined}
       >
         <div className="sidebar-brand">
           <div>
@@ -80,6 +135,9 @@ export default function Sidebar({
           <input
             placeholder="Search chats"
             aria-label="Search chats"
+            type="search"
+            enterKeyHint="search"
+            autoComplete="off"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -130,7 +188,9 @@ export default function Sidebar({
           <span>
             <strong>{person.name}</strong>
             <small>
-              {person.role === "owner" ? "Personal account" : "Family account"}
+              {person.role === "owner"
+                ? "Personal account"
+                : "Personal account"}
             </small>
           </span>
           <Settings size={18} />

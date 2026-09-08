@@ -1,5 +1,7 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { useMobile } from "@/lib/mobile";
 import { X, LoaderCircle } from "lucide-react";
 export function Mark({ size = 28 }: { size?: number }) {
   return (
@@ -47,12 +49,17 @@ export function Modal({
   className?: string;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const dragged = useRef(false);
+  const drag = useRef<{ y: number; time: number } | null>(null);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   useEffect(() => {
     const dialog = ref.current;
     dialog?.showModal();
     return () => dialog?.close();
-  }, []);
-  return (
+  }, [mounted]);
+  if (!mounted) return null;
+  return createPortal(
     <dialog
       ref={ref}
       className={`modal ${className}`}
@@ -63,6 +70,43 @@ export function Modal({
       aria-label={title}
     >
       <div className="modal-inner">
+        <button
+          type="button"
+          className="sheet-grabber mobile-only"
+          aria-label={`Dismiss ${title}`}
+          onClick={() => {
+            if (!dragged.current) onClose();
+            dragged.current = false;
+          }}
+          onPointerDown={(e) => {
+            if (e.pointerType === "mouse") return;
+            dragged.current = false;
+            drag.current = { y: e.clientY, time: performance.now() };
+            e.currentTarget.setPointerCapture(e.pointerId);
+          }}
+          onPointerMove={(e) => {
+            if (!drag.current || !ref.current) return;
+            ref.current.style.transform = `translateY(${Math.max(0, e.clientY - drag.current.y)}px)`;
+          }}
+          onPointerUp={(e) => {
+            if (!drag.current) return;
+            const distance = e.clientY - drag.current.y;
+            const speed =
+              distance / Math.max(1, performance.now() - drag.current.time);
+            drag.current = null;
+            dragged.current = Math.abs(distance) > 8;
+            if (ref.current) ref.current.style.transform = "";
+            if (distance > 80 || (distance > 25 && speed > 0.5)) onClose();
+            // A drag is not a tap on the dismiss button.
+            if (Math.abs(distance) > 8) e.preventDefault();
+          }}
+          onPointerCancel={() => {
+            drag.current = null;
+            if (ref.current) ref.current.style.transform = "";
+          }}
+        >
+          <span />
+        </button>
         <div className="modal-header">
           <h2>{title}</h2>
           <IconButton label="Close" onClick={onClose}>
@@ -71,6 +115,63 @@ export function Modal({
         </div>
         {children}
       </div>
-    </dialog>
+    </dialog>,
+    document.body,
+  );
+}
+
+export function ActionMenu({
+  title,
+  className,
+  onClose,
+  children,
+}: {
+  title: string;
+  className: string;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  const mobile = useMobile();
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (mobile) return;
+    const previous = document.activeElement;
+    ref.current
+      ?.querySelector<HTMLElement>("button, select")
+      ?.focus({ preventScroll: true });
+    return () => {
+      if (previous instanceof HTMLElement && previous.isConnected)
+        previous.focus({ preventScroll: true });
+    };
+  }, [mobile]);
+  if (mobile)
+    return (
+      <Modal title={title} onClose={onClose} className="action-sheet">
+        <div className={`sheet-actions ${className}`}>{children}</div>
+      </Modal>
+    );
+  return (
+    <>
+      <button
+        type="button"
+        className="menu-dismiss"
+        aria-label={`Close ${title.toLowerCase()}`}
+        onClick={onClose}
+      />
+      <div
+        ref={ref}
+        className={`popover ${className}`}
+        role="dialog"
+        aria-label={title}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") {
+            e.stopPropagation();
+            onClose();
+          }
+        }}
+      >
+        {children}
+      </div>
+    </>
   );
 }

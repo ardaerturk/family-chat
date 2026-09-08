@@ -7,6 +7,8 @@ This is an independent application, not an official ChatGPT client. It does not 
 ## What it does
 
 - Installable on iPhone, Android, and desktop; light, dark, and system appearance.
+- Mobile composer follows the visible keyboard viewport, keeps focus when sending, and allows a new draft during streaming. Return inserts a new line on touch devices; desktop Enter sends without interrupting IME composition.
+- Mobile action sheets for models, attachments, and chat options; swipe-down keyboard dismissal, dismissible sheet handles, 44 px controls, and conversation scrolling that preserves your reading position.
 - Owner-issued, single-use invitations. No public signup and no shared password.
 - Discoverable passkeys with required device verification, backed by SimpleWebAuthn.
 - Separate histories for each account, with search, rename, pin, delete, export, edit, regenerate, and stop.
@@ -79,6 +81,7 @@ The repository’s daily Vercel cron calls `/api/maintenance`, protected by `CRO
 - Revocation prevents new requests; it cannot retract data already viewed or immediately terminate an established peer-to-peer voice connection.
 - There is no live web search, code execution sandbox, image generation, or long-term model memory. Word/Excel/PowerPoint attachments are not accepted; export them to PDF or CSV/text first.
 - PDF/image support depends on the configured Azure model. Azure service retention, abuse monitoring, and regional processing remain subject to your Azure configuration; `store:false` does not imply zero provider retention.
+- This remains a web app, not a UIKit application. The operating system controls keyboard animation, dictation, selection, and native pickers. Home Screen mode removes browser chrome; a physical device check is needed to assess those platform interactions.
 - The app needs connectivity for chat. It is not an offline inference client. Device passkeys, microphone permissions, audio autoplay, and Home Screen installation need a real-device check on your target iOS/Android version.
 - A deployment URL is an address, not a secret or an access control. HTTPS certificates and infrastructure metadata may make a hostname discoverable even if you keep it out of this repository.
 

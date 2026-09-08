@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import type { Message } from "@/lib/types";
 import { IconButton, Mark } from "./ui";
+import { dismissKeyboard } from "@/lib/mobile";
 function CodeBlock({ children }: { children: React.ReactNode }) {
   const ref = useRef<HTMLPreElement>(null),
     [copied, setCopied] = useState(false);
@@ -46,15 +47,45 @@ export default function Messages({
   onRetry: () => void;
   onEdit: (m: Message) => void;
 }) {
-  const end = useRef<HTMLDivElement>(null),
+  const content = useRef<HTMLDivElement>(null),
     area = useRef<HTMLDivElement>(null),
     [follow, setFollow] = useState(true),
     [copied, setCopied] = useState(""),
     [speaking, setSpeaking] = useState("");
+  const following = useRef(true);
+  const lastTop = useRef(0);
+  const touch = useRef<{ x: number; y: number } | null>(null);
+  const lastUser = useRef<{ index: number; content: string } | null>(null);
+  function scrollToBottom() {
+    const el = area.current;
+    if (el) {
+      el.scrollTop = el.scrollHeight;
+      lastTop.current = el.scrollTop;
+    }
+  }
+  useLayoutEffect(() => {
+    const index = messages.findLastIndex((m) => m.role === "user");
+    const content = messages[index]?.content ?? "";
+    // Saved IDs replace optimistic IDs after streaming; that reconciliation
+    // must not move a reader who has scrolled back through the conversation.
+    if (
+      index !== lastUser.current?.index ||
+      content !== lastUser.current?.content
+    ) {
+      lastUser.current = { index, content };
+      following.current = true;
+      setFollow(true);
+    }
+    if (following.current) scrollToBottom();
+  }, [messages]);
   useEffect(() => {
-    if (follow)
-      end.current?.scrollIntoView({ behavior: "instant", block: "end" });
-  }, [messages, follow]);
+    const observer = new ResizeObserver(() => {
+      if (following.current) scrollToBottom();
+    });
+    if (area.current) observer.observe(area.current);
+    if (content.current) observer.observe(content.current);
+    return () => observer.disconnect();
+  }, []);
   useEffect(
     () => () => {
       window.speechSynthesis?.cancel();
@@ -86,13 +117,43 @@ export default function Messages({
     <div
       className="message-scroller"
       ref={area}
+      onTouchStart={(e) => {
+        const typing = document.activeElement?.matches(".composer textarea");
+        touch.current =
+          typing && e.touches.length === 1
+            ? { x: e.touches[0].clientX, y: e.touches[0].clientY }
+            : null;
+      }}
+      onTouchMove={(e) => {
+        if (!touch.current || e.touches.length !== 1) return;
+        const point = e.touches[0];
+        if (
+          point.clientY - touch.current.y > 40 &&
+          Math.abs(point.clientX - touch.current.x) < 30
+        ) {
+          touch.current = null;
+          if (!window.getSelection()?.toString()) dismissKeyboard();
+        }
+      }}
+      onTouchEnd={() => {
+        touch.current = null;
+      }}
+      onTouchCancel={() => {
+        touch.current = null;
+      }}
       onScroll={() => {
         const el = area.current;
-        if (el)
-          setFollow(el.scrollHeight - el.scrollTop - el.clientHeight < 130);
+        if (!el) return;
+        const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
+        // Only disengage when the reader moves upward, not when the keyboard
+        // or a growing response changes the height of the scroll container.
+        if (atBottom) following.current = true;
+        else if (el.scrollTop < lastTop.current - 2) following.current = false;
+        lastTop.current = el.scrollTop;
+        setFollow(following.current);
       }}
     >
-      <div className="messages">
+      <div className="messages" ref={content}>
         {messages.map((m, index) => (
           <article
             className={`message ${m.role}`}
@@ -202,15 +263,15 @@ export default function Messages({
             )}
           </article>
         ))}
-        <div ref={end} />
       </div>
       {!follow ? (
         <IconButton
           label="Scroll to latest message"
           className="scroll-bottom"
           onClick={() => {
+            following.current = true;
             setFollow(true);
-            end.current?.scrollIntoView({ behavior: "smooth" });
+            scrollToBottom();
           }}
         >
           <ChevronDown size={20} />

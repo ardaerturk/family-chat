@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useLayoutEffect, useState } from "react";
 import {
   Plus,
   ArrowUp,
@@ -10,9 +10,11 @@ import {
   Paperclip,
   Camera,
   Image as ImageIcon,
+  Keyboard,
 } from "lucide-react";
 import type { Attachment } from "@/lib/types";
-import { IconButton, Spinner } from "./ui";
+import { ActionMenu, IconButton, Spinner } from "./ui";
+import { dismissKeyboard } from "@/lib/mobile";
 export default function Composer({
   text,
   setText,
@@ -46,19 +48,50 @@ export default function Composer({
   editing: boolean;
   onCancelEdit: () => void;
 }) {
+  const areaRef = useRef<HTMLDivElement>(null);
   const ref = useRef<HTMLTextAreaElement>(null),
     fileRef = useRef<HTMLInputElement>(null),
     cameraRef = useRef<HTMLInputElement>(null);
   const [menu, setMenu] = useState(false);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = ref.current;
-    if (el) {
+    if (!el) return;
+    function resize() {
+      if (!el) return;
+      const limit = Math.max(
+        64,
+        Math.min(180, (window.visualViewport?.height ?? innerHeight) * 0.3),
+      );
       el.style.height = "0px";
-      el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
+      const height = el.scrollHeight;
+      el.style.height = `${Math.min(height, limit)}px`;
+      el.style.overflowY = height > limit ? "auto" : "hidden";
     }
+    resize();
+    window.visualViewport?.addEventListener("resize", resize);
+    window.addEventListener("resize", resize);
+    return () => {
+      window.visualViewport?.removeEventListener("resize", resize);
+      window.removeEventListener("resize", resize);
+    };
   }, [text]);
+  useEffect(() => {
+    const area = areaRef.current;
+    if (!area) return;
+    const observer = new ResizeObserver(() => {
+      area.parentElement?.style.setProperty(
+        "--composer-height",
+        `${area.offsetHeight}px`,
+      );
+    });
+    observer.observe(area);
+    return () => observer.disconnect();
+  }, []);
+  function keepKeyboard(e: React.PointerEvent<HTMLButtonElement>) {
+    if (document.activeElement === ref.current) e.preventDefault();
+  }
   return (
-    <div className="composer-area">
+    <div className="composer-area" ref={areaRef}>
       {editing ? (
         <div className="edit-banner">
           Editing message
@@ -119,13 +152,17 @@ export default function Composer({
           value={text}
           onChange={(e) => setText(e.target.value)}
           rows={1}
-          disabled={busy}
+          enterKeyHint="enter"
+          autoCapitalize="sentences"
+          autoCorrect="on"
+          spellCheck
           onKeyDown={(e) => {
             if (
               e.key === "Enter" &&
               !e.shiftKey &&
               !e.nativeEvent.isComposing &&
-              window.matchMedia("(min-width: 768px)").matches
+              e.nativeEvent.keyCode !== 229 &&
+              window.matchMedia("(hover: hover) and (pointer: fine)").matches
             ) {
               e.preventDefault();
               if (!busy && !uploading && text.trim()) onSend();
@@ -137,45 +174,47 @@ export default function Composer({
             <IconButton
               label="Add attachments"
               disabled={busy || uploading || temporary || files.length >= 4}
-              onClick={() => setMenu(!menu)}
+              onClick={() => {
+                dismissKeyboard();
+                setMenu(!menu);
+              }}
               aria-expanded={menu}
+              aria-haspopup="dialog"
             >
               <Plus size={24} />
             </IconButton>
             {menu ? (
-              <>
+              <ActionMenu
+                title="Add attachments"
+                className="attachment-menu"
+                onClose={() => setMenu(false)}
+              >
                 <button
                   type="button"
-                  className="menu-dismiss"
-                  aria-label="Close attachment menu"
-                  onClick={() => setMenu(false)}
-                />
-                <div className="popover attachment-menu">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      cameraRef.current?.click();
-                      setMenu(false);
-                    }}
-                  >
-                    <Camera size={18} /> Take photo
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      fileRef.current?.click();
-                      setMenu(false);
-                    }}
-                  >
-                    <Paperclip size={18} /> Add photos & files
-                  </button>
-                  <p>
-                    PDF, images, text & code
-                    <br />
-                    Up to 3 MB each · 4 files per message
-                  </p>
-                </div>
-              </>
+                  onClick={(e) => {
+                    e.currentTarget.closest("dialog")?.close();
+                    cameraRef.current?.click();
+                    setMenu(false);
+                  }}
+                >
+                  <Camera size={18} /> Take photo
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.currentTarget.closest("dialog")?.close();
+                    fileRef.current?.click();
+                    setMenu(false);
+                  }}
+                >
+                  <Paperclip size={18} /> Add photos & files
+                </button>
+                <p>
+                  PDF, images, text & code
+                  <br />
+                  Up to 3 MB each · 4 files per message
+                </p>
+              </ActionMenu>
             ) : null}
           </div>
           <input
@@ -207,8 +246,19 @@ export default function Composer({
             }}
           />
           <div className="composer-right">
+            <IconButton
+              label="Hide keyboard"
+              className="keyboard-dismiss"
+              onClick={dismissKeyboard}
+            >
+              <Keyboard size={20} />
+            </IconButton>
             {voice && !text && !busy ? (
-              <IconButton label="Start voice conversation" onClick={onVoice}>
+              <IconButton
+                label="Start voice conversation"
+                className="voice-button"
+                onClick={onVoice}
+              >
                 <AudioLines size={23} />
               </IconButton>
             ) : null}
@@ -217,19 +267,21 @@ export default function Composer({
                 label="Stop generating"
                 className="send-button"
                 onClick={onStop}
+                onPointerDown={keepKeyboard}
               >
                 <Square size={14} fill="currentColor" />
               </IconButton>
-            ) : (
+            ) : text || !voice ? (
               <button
                 className="send-button icon-button"
                 type="submit"
                 aria-label="Send message"
                 disabled={!text.trim() || uploading}
+                onPointerDown={keepKeyboard}
               >
                 <ArrowUp size={22} strokeWidth={2.4} />
               </button>
-            )}
+            ) : null}
           </div>
         </div>
       </form>

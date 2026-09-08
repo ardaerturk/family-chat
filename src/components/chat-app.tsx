@@ -30,7 +30,8 @@ import Welcome from "./welcome";
 import Sidebar from "./sidebar";
 import Composer from "./composer";
 import Messages from "./messages";
-import { IconButton, Modal, Spinner } from "./ui";
+import { ActionMenu, IconButton, Mark, Modal, Spinner } from "./ui";
+import { dismissKeyboard, useMobile, useMobileViewport } from "@/lib/mobile";
 const Settings = dynamic(() => import("./settings"));
 const Voice = dynamic(() => import("./voice"));
 type Identity = { person: Person; models: Model[]; voice: boolean };
@@ -61,6 +62,8 @@ const suggestions = [
   },
 ];
 export default function ChatApp() {
+  useMobileViewport();
+  const mobile = useMobile();
   const [identity, setIdentity] = useState<Identity | null>(null),
     [loading, setLoading] = useState(true),
     [bootError, setBootError] = useState(""),
@@ -134,17 +137,6 @@ export default function ChatApp() {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    const viewport = window.visualViewport;
-    const resize = () =>
-      document.documentElement.style.setProperty(
-        "--app-height",
-        `${viewport?.height ?? window.innerHeight}px`,
-      );
-    resize();
-    viewport?.addEventListener("resize", resize);
-    return () => viewport?.removeEventListener("resize", resize);
-  }, []);
-  useEffect(() => {
     function keys(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
@@ -161,6 +153,21 @@ export default function ChatApp() {
     window.addEventListener("keydown", keys);
     return () => window.removeEventListener("keydown", keys);
   }, []);
+  useEffect(() => {
+    const preference = window.matchMedia("(prefers-color-scheme: dark)");
+    function updateChrome() {
+      const dark =
+        theme === "dark" || (theme === "system" && preference.matches);
+      document
+        .querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')
+        .forEach((meta) => {
+          meta.content = dark ? "#212121" : "#ffffff";
+        });
+    }
+    updateChrome();
+    preference.addEventListener("change", updateChrome);
+    return () => preference.removeEventListener("change", updateChrome);
+  }, [theme]);
   function setTheme(v: string) {
     setThemeState(v);
     document.documentElement.dataset.theme = v;
@@ -168,6 +175,7 @@ export default function ChatApp() {
   }
   function newChat(temp = false) {
     if (busy || uploading) return;
+    dismissKeyboard();
     files.forEach((f) => api(`files/${f.id}`, "DELETE").catch(() => {}));
     setActive(null);
     setMessages([]);
@@ -181,6 +189,7 @@ export default function ChatApp() {
   }
   async function select(id: string) {
     if (busy || uploading) return;
+    dismissKeyboard();
     setError("");
     try {
       const c = await api<Conversation>(`chats/${id}`);
@@ -240,6 +249,7 @@ export default function ChatApp() {
     if (!prompt) return;
     setError("");
     setBusy(true);
+    if (!retry) setText("");
     setModelMenu(false);
     const previous = messages;
     let base = retry
@@ -303,9 +313,10 @@ export default function ChatApp() {
         const value = await response.json();
         throw new Error(value.error || "The message could not be sent.");
       }
-      setText("");
-      setFiles([]);
-      setEditing(null);
+      if (!retry) {
+        setFiles([]);
+        setEditing(null);
+      }
       const reader = response.body?.getReader();
       if (!reader) throw new Error("The connection ended. Please try again.");
       const decoder = new TextDecoder();
@@ -346,6 +357,10 @@ export default function ChatApp() {
         }
       }
     } catch (e) {
+      if (!started) {
+        setMessages(previous);
+        if (!retry) setText((draft) => draft || prompt);
+      }
       if (controller.signal.aborted) {
         setMessages((current) =>
           current.map((m) =>
@@ -358,8 +373,6 @@ export default function ChatApp() {
         failed = true;
       }
     } finally {
-      setBusy(false);
-      abort.current = null;
       if (!temporary) {
         try {
           await refreshChats();
@@ -371,6 +384,8 @@ export default function ChatApp() {
           if (!failed) setError("Could not refresh saved chat history.");
         }
       }
+      abort.current = null;
+      setBusy(false);
     }
   }
   async function renameChat() {
@@ -439,7 +454,7 @@ export default function ChatApp() {
         chats={chats}
         active={active}
         open={sidebar}
-        busy={busy}
+        busy={busy || uploading}
         onClose={() => setSidebar(false)}
         onNew={() => newChat()}
         onSelect={select}
@@ -448,67 +463,75 @@ export default function ChatApp() {
           setSidebar(false);
         }}
       />
-      <main className="chat-main">
+      <main className="chat-main" inert={mobile && sidebar ? true : undefined}>
         <header className="chat-header">
           <IconButton
             label="Open sidebar"
             className="mobile-only"
-            onClick={() => setSidebar(true)}
+            onClick={() => {
+              dismissKeyboard();
+              setSidebar(true);
+            }}
           >
             <PanelLeft size={23} />
           </IconButton>
           <div className="model-picker">
             <button
               className="model-trigger"
-              onClick={() => setModelMenu(!modelMenu)}
+              onClick={() => {
+                dismissKeyboard();
+                setModelMenu(!modelMenu);
+              }}
+              aria-label={`Choose model, current ${selectedModel.label}`}
+              aria-haspopup="dialog"
               aria-expanded={modelMenu}
               disabled={busy}
             >
-              {selectedModel.label}
+              <span className="model-heading">
+                <span className="mobile-only app-name">ChatGPT</span>
+                <span className="model-name">{selectedModel.label}</span>
+              </span>
               <ChevronDown size={17} />
             </button>
             {modelMenu ? (
-              <>
-                <button
-                  className="menu-dismiss"
-                  aria-label="Close model menu"
-                  onClick={() => setModelMenu(false)}
-                />
-                <div className="popover model-menu">
-                  <h3>Choose a model</h3>
-                  {identity.models.map((m) => (
-                    <button
-                      key={m.id}
-                      className="model-option"
-                      onClick={() => {
-                        setModel(m.id);
-                        setModelMenu(false);
-                      }}
-                    >
-                      <div>
-                        <strong>{m.label}</strong>
-                        <span>{m.description}</span>
-                      </div>
-                      {m.id === model ? <Check size={18} /> : null}
-                    </button>
-                  ))}
-                  {selectedModel.reasoning ? (
-                    <div className="reasoning-option">
-                      <label htmlFor="reasoning">Thinking effort</label>
-                      <select
-                        id="reasoning"
-                        value={reasoning}
-                        onChange={(e) => setReasoning(e.target.value)}
-                      >
-                        <option value="low">Quick</option>
-                        <option value="medium">Balanced</option>
-                        <option value="high">Deep</option>
-                      </select>
+              <ActionMenu
+                title="Choose a model"
+                className="model-menu"
+                onClose={() => setModelMenu(false)}
+              >
+                {identity.models.map((m) => (
+                  <button
+                    key={m.id}
+                    className="model-option"
+                    aria-pressed={m.id === model}
+                    onClick={() => {
+                      setModel(m.id);
+                      setModelMenu(false);
+                    }}
+                  >
+                    <div>
+                      <strong>{m.label}</strong>
+                      <span>{m.description}</span>
                     </div>
-                  ) : null}
-                  <p>Available through your private Azure connection</p>
-                </div>
-              </>
+                    {m.id === model ? <Check size={18} /> : null}
+                  </button>
+                ))}
+                {selectedModel.reasoning ? (
+                  <div className="reasoning-option">
+                    <label htmlFor="reasoning">Thinking effort</label>
+                    <select
+                      id="reasoning"
+                      value={reasoning}
+                      onChange={(e) => setReasoning(e.target.value)}
+                    >
+                      <option value="low">Quick</option>
+                      <option value="medium">Balanced</option>
+                      <option value="high">Deep</option>
+                    </select>
+                  </div>
+                ) : null}
+                <p>Available through your private Azure connection</p>
+              </ActionMenu>
             ) : null}
           </div>
           <div className="header-right">
@@ -533,77 +556,79 @@ export default function ChatApp() {
             <div className="more-wrap">
               <IconButton
                 label="Chat options"
-                onClick={() => setMoreMenu(!moreMenu)}
+                onClick={() => {
+                  dismissKeyboard();
+                  setMoreMenu(!moreMenu);
+                }}
+                aria-expanded={moreMenu}
+                aria-haspopup="dialog"
                 disabled={busy}
               >
                 <MoreHorizontal size={23} />
               </IconButton>
               {moreMenu ? (
-                <>
+                <ActionMenu
+                  title="Chat options"
+                  className="more-menu"
+                  onClose={() => setMoreMenu(false)}
+                >
+                  {active ? (
+                    <>
+                      <button
+                        onClick={() => {
+                          setRename(current?.title ?? "");
+                          setMoreMenu(false);
+                        }}
+                      >
+                        <Pencil size={17} />
+                        Rename
+                      </button>
+                      <button
+                        onClick={async () => {
+                          try {
+                            await api(`chats/${active}`, "PATCH", {
+                              pinned: !current?.pinned,
+                            });
+                            await refreshChats();
+                            setMoreMenu(false);
+                          } catch (e) {
+                            setError(errorMessage(e));
+                          }
+                        }}
+                      >
+                        <Pin size={17} />
+                        {current?.pinned ? "Unpin chat" : "Pin chat"}
+                      </button>
+                      <button
+                        className="danger"
+                        onClick={() => {
+                          setConfirmDelete(true);
+                          setMoreMenu(false);
+                        }}
+                      >
+                        <Trash2 size={17} />
+                        Delete chat
+                      </button>
+                    </>
+                  ) : null}
                   <button
-                    className="menu-dismiss"
-                    aria-label="Close chat options"
-                    onClick={() => setMoreMenu(false)}
-                  />
-                  <div className="popover more-menu">
-                    {active ? (
-                      <>
-                        <button
-                          onClick={() => {
-                            setRename(current?.title ?? "");
-                            setMoreMenu(false);
-                          }}
-                        >
-                          <Pencil size={17} />
-                          Rename
-                        </button>
-                        <button
-                          onClick={async () => {
-                            try {
-                              await api(`chats/${active}`, "PATCH", {
-                                pinned: !current?.pinned,
-                              });
-                              await refreshChats();
-                              setMoreMenu(false);
-                            } catch (e) {
-                              setError(errorMessage(e));
-                            }
-                          }}
-                        >
-                          <Pin size={17} />
-                          {current?.pinned ? "Unpin chat" : "Pin chat"}
-                        </button>
-                        <button
-                          className="danger"
-                          onClick={() => {
-                            setConfirmDelete(true);
-                            setMoreMenu(false);
-                          }}
-                        >
-                          <Trash2 size={17} />
-                          Delete chat
-                        </button>
-                      </>
-                    ) : null}
-                    <button
-                      onClick={() => {
-                        newChat(!temporary);
-                        setMoreMenu(false);
-                      }}
-                    >
-                      <MessageCircleDashed size={17} />
-                      {temporary ? "Saved chat" : "Temporary chat"}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSettings(true);
-                        setMoreMenu(false);
-                      }}
-                    >
-                      Settings
-                    </button>
-                  </div>
-                </>
+                    onClick={() => {
+                      newChat(!temporary);
+                      setMoreMenu(false);
+                    }}
+                  >
+                    <MessageCircleDashed size={17} />
+                    {temporary ? "Saved chat" : "Temporary chat"}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSettings(true);
+                      setMoreMenu(false);
+                    }}
+                  >
+                    Settings
+                  </button>
+                </ActionMenu>
               ) : null}
             </div>
           </div>
@@ -618,6 +643,11 @@ export default function ChatApp() {
             <div className="empty-content">
               {temporary ? (
                 <MessageCircleDashed className="empty-icon" size={36} />
+              ) : null}
+              {!temporary ? (
+                <div className="empty-mark mobile-only">
+                  <Mark size={40} />
+                </div>
               ) : null}
               <h1>
                 {temporary
@@ -637,7 +667,7 @@ export default function ChatApp() {
                           .querySelector<HTMLTextAreaElement>(
                             '[aria-label="Message"]',
                           )
-                          ?.focus();
+                          ?.focus({ preventScroll: true });
                       }}
                     >
                       <s.icon size={17} />
@@ -650,6 +680,7 @@ export default function ChatApp() {
           </div>
         ) : (
           <Messages
+            key={active ?? "new"}
             messages={messages}
             busy={busy}
             onRetry={() => send(true)}
@@ -659,7 +690,7 @@ export default function ChatApp() {
               setFiles([]);
               document
                 .querySelector<HTMLTextAreaElement>('[aria-label="Message"]')
-                ?.focus();
+                ?.focus({ preventScroll: true });
             }}
           />
         )}
@@ -684,7 +715,10 @@ export default function ChatApp() {
           uploading={uploading}
           temporary={temporary}
           voice={identity.voice}
-          onVoice={() => setVoice(true)}
+          onVoice={() => {
+            dismissKeyboard();
+            setVoice(true);
+          }}
           editing={!!editing}
           onCancelEdit={() => {
             setEditing(null);
