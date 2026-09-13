@@ -1,4 +1,5 @@
 "use client";
+import { useI18n } from "./language-provider";
 import { useEffect, useState } from "react";
 import {
   Fingerprint,
@@ -42,6 +43,8 @@ export default function Settings({
   onLogout: () => void;
   onCleared: () => void;
 }) {
+  const { t, language, setLanguage } = useI18n();
+  const [savingLanguage, setSavingLanguage] = useState(false);
   const [tab, setTab] = useState("general"),
     [sessions, setSessions] = useState<SessionView[]>([]),
     [people, setPeople] = useState<PeopleData>({ people: [], invitations: [] }),
@@ -99,12 +102,12 @@ export default function Settings({
             : "Browser";
   }
   return (
-    <Modal title="Settings" onClose={onClose} className="settings-modal">
+    <Modal title={t("Settings")} onClose={onClose} className="settings-modal">
       <div className="settings-tabs" role="tablist">
         {[
-          ["general", "General"],
-          ["security", "Security"],
-          ...(person.role === "owner" ? [["family", "Family"]] : []),
+          ["general", t("General")],
+          ["security", t("Security")],
+          ...(person.role === "owner" ? [["family", t("Family")]] : []),
         ].map(([id, label]) => (
           <button
             key={id}
@@ -116,19 +119,19 @@ export default function Settings({
               setMessage("");
             }}
           >
-            {label}
+            {t(label)}
           </button>
         ))}
       </div>
       <div className="settings-content">
         {error ? (
           <div className="error-box" role="alert">
-            {error}
+            {t(error)}
           </div>
         ) : null}
         {message ? (
           <div className="success-box" role="status">
-            {message}
+            {t(message)}
           </div>
         ) : null}
         {reauth ? (
@@ -142,30 +145,61 @@ export default function Settings({
               })
             }
           >
-            <Fingerprint size={18} /> Unlock again
+            <Fingerprint size={18} /> {t("Unlock again")}
           </button>
         ) : null}
         {tab === "general" ? (
           <>
             <div className="settings-row">
               <div>
-                <strong>Appearance</strong>
-                <p>Make yourself at home.</p>
+                <strong>{t("Language")}</strong>
+                <p>{t("Saved to your account on all devices.")}</p>
               </div>
               <select
-                aria-label="Appearance"
-                value={theme}
-                onChange={(e) => setTheme(e.target.value)}
+                aria-label={t("Language")}
+                value={language}
+                disabled={savingLanguage}
+                onChange={async (e) => {
+                  const value = e.target.value as "en" | "tr";
+                  setSavingLanguage(true);
+                  setError("");
+                  try {
+                    await api("preferences", "PATCH", { language: value });
+                    setLanguage(value);
+                  } catch (e) {
+                    setError(errorMessage(e));
+                  } finally {
+                    setSavingLanguage(false);
+                  }
+                }}
               >
-                <option value="system">System</option>
-                <option value="light">Light</option>
-                <option value="dark">Dark</option>
+                <option value="en" lang="en">
+                  English
+                </option>
+                <option value="tr" lang="tr">
+                  Türkçe
+                </option>
               </select>
             </div>
             <div className="settings-row">
               <div>
-                <strong>Export conversations</strong>
-                <p>Download your chat history as JSON.</p>
+                <strong>{t("Appearance")}</strong>
+                <p>{t("Make yourself at home.")}</p>
+              </div>
+              <select
+                aria-label={t("Appearance")}
+                value={theme}
+                onChange={(e) => setTheme(e.target.value)}
+              >
+                <option value="system">{t("System")}</option>
+                <option value="light">{t("Light")}</option>
+                <option value="dark">{t("Dark")}</option>
+              </select>
+            </div>
+            <div className="settings-row">
+              <div>
+                <strong>{t("Export conversations")}</strong>
+                <p>{t("Download your chat history as JSON.")}</p>
               </div>
               <button
                 className="secondary"
@@ -173,13 +207,13 @@ export default function Settings({
                 onClick={() => act(exportData)}
               >
                 <Download size={16} />
-                Export
+                {t("Export")}
               </button>
             </div>
             <div className="settings-row">
               <div>
-                <strong>Delete all chats</strong>
-                <p>Remove your saved chats and attachments.</p>
+                <strong>{t("Delete all chats")}</strong>
+                <p>{t("Remove your saved chats and attachments.")}</p>
               </div>
               <button
                 className="secondary danger"
@@ -187,14 +221,15 @@ export default function Settings({
                 onClick={() => setConfirmClear(true)}
               >
                 <Trash2 size={16} />
-                Delete
+                {t("Delete")}
               </button>
             </div>
             {confirmClear ? (
               <div className="confirmation">
                 <p>
-                  Delete all your conversations permanently? This cannot be
-                  undone.
+                  {t(
+                    "Delete all your conversations permanently? This cannot be undone.",
+                  )}
                 </p>
                 <button
                   className="primary danger-button"
@@ -204,38 +239,40 @@ export default function Settings({
                       await api("chats", "DELETE");
                       setConfirmClear(false);
                       onCleared();
-                      setMessage("Your conversations were deleted.");
+                      setMessage(t("Your conversations were deleted."));
                     })
                   }
                 >
-                  Delete all chats
+                  {t("Delete all chats")}
                 </button>
                 <button
                   className="secondary"
                   onClick={() => setConfirmClear(false)}
                 >
-                  Keep chats
+                  {t("Keep chats")}
                 </button>
               </div>
             ) : null}
             <div className="settings-note">
               <Smartphone size={20} />
               <div>
-                <strong>Install on your phone</strong>
+                <strong>{t("Install on your phone")}</strong>
                 <p>
-                  iPhone: Safari → Share → Add to Home Screen.
+                  {t("iPhone: Safari → Share → Add to Home Screen.")}
                   <br />
-                  Android: browser menu → Install app.
+                  {t("Android: browser menu → Install app.")}
                 </p>
               </div>
             </div>
             <div className="settings-about">
               <strong>ChatGPT</strong>
-              <p>Private Azure-powered client. Not affiliated with OpenAI.</p>
               <p>
-                Supports PDF, images, and text/code files up to 3 MB each. No
-                live web search or code execution. Voice is a separate
-                conversation and isn’t saved. AI responses may be inaccurate.
+                {t("Private Azure-powered client. Not affiliated with OpenAI.")}
+              </p>
+              <p>
+                {t(
+                  "Web search with sources, photos, PDFs, and text/code files. Voice is separate and is not saved. No code execution or image generation.",
+                )}
               </p>
             </div>
           </>
@@ -244,8 +281,10 @@ export default function Settings({
           <>
             <div className="settings-row">
               <div>
-                <strong>Passkeys</strong>
-                <p>Use your device’s Face ID, fingerprint, or screen lock.</p>
+                <strong>{t("Passkeys")}</strong>
+                <p>
+                  {t("Use your device’s Face ID, fingerprint, or screen lock.")}
+                </p>
               </div>
               <button
                 className="secondary"
@@ -254,7 +293,7 @@ export default function Settings({
                   act(async () => {
                     try {
                       await register();
-                      setMessage("Passkey added.");
+                      setMessage(t("Passkey added."));
                     } catch (e) {
                       throw new Error(passkeyError(e));
                     }
@@ -262,22 +301,23 @@ export default function Settings({
                 }
               >
                 <Fingerprint size={17} />
-                Add
+                {t("Add")}
               </button>
             </div>
-            <div className="section-heading">Signed-in devices</div>
+            <div className="section-heading">{t("Signed-in devices")}</div>
             {sessions.map((s) => (
               <div className="settings-row" key={s.id}>
                 <div>
                   <strong>
-                    {device(s.device)}{" "}
+                    {t(device(s.device))}{" "}
                     {s.current ? (
-                      <span className="tag">This device</span>
+                      <span className="tag">{t("This device")}</span>
                     ) : null}
                   </strong>
                   <p>
-                    Signed in {new Date(s.createdAt).toLocaleDateString()} ·
-                    Trusted device
+                    {t("Signed in {date} · Trusted device", {
+                      date: new Date(s.createdAt).toLocaleDateString(language),
+                    })}
                   </p>
                 </div>
                 <button
@@ -291,19 +331,18 @@ export default function Settings({
                     })
                   }
                 >
-                  {s.current ? "Sign out" : "Revoke"}
+                  {s.current ? t("Sign out") : t("Revoke")}
                 </button>
               </div>
             ))}
             <div className="settings-note">
               <ShieldCheck size={21} />
               <div>
-                <strong>Private by design</strong>
+                <strong>{t("Private by design")}</strong>
                 <p>
-                  Only invited people can join. Your chats are separate. You
-                  stay signed in while you use this device. After a year without
-                  using it, unlock again. Lost access? Ask the owner for a
-                  recovery invitation.
+                  {t(
+                    "Only invited people can join. Your chats are separate. You stay signed in while you use this device. After a year without using it, unlock again. Lost access? Ask the owner for a recovery invitation.",
+                  )}
                 </p>
               </div>
             </div>
@@ -318,15 +357,16 @@ export default function Settings({
               }
             >
               <LogOut size={17} />
-              Sign out
+              {t("Sign out")}
             </button>
           </>
         ) : null}
         {tab === "family" ? (
           <>
             <p className="section-intro">
-              Only you can invite someone. Each person gets their own private
-              chat history. There is no public signup.
+              {t(
+                "Only you can invite someone. Each person gets their own private chat history. There is no public signup.",
+              )}
             </p>
             <form
               className="invite-form"
@@ -345,23 +385,30 @@ export default function Settings({
               }}
             >
               <input
-                placeholder="Name, e.g. Mom"
-                aria-label="Person’s name"
+                placeholder={t("Name, e.g. Mom")}
+                aria-label={t("Person’s name")}
                 maxLength={60}
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />
               <button className="primary" disabled={busy || !name.trim()}>
-                {busy ? <Spinner /> : <UserPlus size={17} />}Invite
+                {busy ? <Spinner /> : <UserPlus size={17} />}
+                {t("Invite")}
               </button>
             </form>
             {invite ? (
               <div className="invitation-result">
-                <strong>Personal invitation ready</strong>
-                <p>Share privately. Works once and expires in 24 hours.</p>
+                <strong>{t("Personal invitation ready")}</strong>
+                <p>
+                  {t("Share privately. Works once and expires in 24 hours.")}
+                </p>
                 <div>
-                  <input readOnly value={invite} aria-label="Invitation link" />
+                  <input
+                    readOnly
+                    value={invite}
+                    aria-label={t("Invitation link")}
+                  />
                   <button
                     className="secondary"
                     onClick={() =>
@@ -373,7 +420,7 @@ export default function Settings({
                     }
                   >
                     {copied ? <Check size={17} /> : <Copy size={17} />}{" "}
-                    {copied ? "Copied" : "Copy"}
+                    {copied ? t("Copied") : t("Copy")}
                   </button>
                 </div>
                 {typeof navigator !== "undefined" && !!navigator.share ? (
@@ -382,28 +429,28 @@ export default function Settings({
                     onClick={() =>
                       act(async () =>
                         navigator.share({
-                          title: "Join ChatGPT",
+                          title: t("Join ChatGPT"),
                           url: invite,
                         }),
                       )
                     }
                   >
-                    Share invitation
+                    {t("Share invitation")}
                   </button>
                 ) : null}
               </div>
             ) : null}
-            <div className="section-heading">People</div>
+            <div className="section-heading">{t("People")}</div>
             {people.people.map((p) => (
               <div className="settings-row" key={p.id}>
                 <div>
                   <strong>{p.name}</strong>
                   <p>
                     {p.role === "owner"
-                      ? "Owner"
+                      ? t("Owner")
                       : p.disabled
-                        ? "Access revoked"
-                        : "Member"}
+                        ? t("Access revoked")
+                        : t("Member")}
                   </p>
                 </div>
                 {p.id !== person.id ? (
@@ -411,7 +458,7 @@ export default function Settings({
                     <button
                       className="text-button"
                       disabled={busy || p.disabled}
-                      title="Create a recovery invitation"
+                      title={t("Create a recovery invitation")}
                       onClick={() =>
                         act(async () => {
                           const result = await api<{ url: string }>(
@@ -425,7 +472,7 @@ export default function Settings({
                       }
                     >
                       <Link2 size={15} />
-                      Recover
+                      {t("Recover")}
                     </button>
                     <button
                       className={`text-button ${p.disabled ? "" : "danger"}`}
@@ -442,26 +489,32 @@ export default function Settings({
                       {p.disabled ? (
                         <>
                           <RotateCcw size={15} />
-                          Restore
+                          {t("Restore")}
                         </>
                       ) : (
-                        "Revoke"
+                        t("Revoke")
                       )}
                     </button>
                   </div>
                 ) : (
-                  <span className="tag">You</span>
+                  <span className="tag">{t("You")}</span>
                 )}
               </div>
             ))}
             {people.invitations.length ? (
               <>
-                <div className="section-heading">Pending invitations</div>
+                <div className="section-heading">
+                  {t("Pending invitations")}
+                </div>
                 {people.invitations.map((i) => (
                   <div className="settings-row" key={i.id}>
                     <div>
                       <strong>{i.name}</strong>
-                      <p>Expires {new Date(i.expiresAt).toLocaleString()}</p>
+                      <p>
+                        {t("Expires {date}", {
+                          date: new Date(i.expiresAt).toLocaleString(language),
+                        })}
+                      </p>
                     </div>
                     <button
                       className="text-button danger"
@@ -473,7 +526,7 @@ export default function Settings({
                         })
                       }
                     >
-                      Cancel
+                      {t("Cancel")}
                     </button>
                   </div>
                 ))}

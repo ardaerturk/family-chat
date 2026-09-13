@@ -4,9 +4,11 @@ import { z } from "zod";
 import { session } from "./auth";
 import { body, fail } from "./http";
 import { env, endpoint, voiceAvailable } from "./config";
-import { rate } from "./store";
+import type { Preferences } from "../types";
+import { get, rate } from "./store";
 export async function voice(req: NextRequest) {
   const { person } = await session(req);
+  const preferences = await get<Preferences>(person.id, "preferences");
   if (!voiceAvailable()) fail(503, "Voice is not configured.");
   const { sdp } = await body(
     req,
@@ -27,8 +29,7 @@ export async function voice(req: NextRequest) {
       session: {
         type: "realtime",
         model: env("AZURE_REALTIME_MODEL"),
-        instructions:
-          "You are a helpful private voice assistant. Speak naturally and in the language the person uses. Keep answers concise unless asked for more detail. This is a separate voice conversation; you do not have access to saved text chats.",
+        instructions: `You are a helpful private voice assistant. The preferred language is ${preferences?.value.language === "tr" ? "Turkish" : "English"}. Speak naturally in that language unless asked otherwise. Keep answers concise unless asked for more detail. This is a separate voice conversation; you do not have access to saved text chats or web search.`,
         audio: { output: { voice: "marin" } },
         max_output_tokens: 2048,
       },

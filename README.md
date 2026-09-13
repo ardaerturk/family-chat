@@ -13,6 +13,9 @@ This is an independent application, not an official ChatGPT client. It does not 
 - Discoverable passkeys with required device verification, backed by SimpleWebAuthn.
 - Separate histories for each account, with search, rename, pin, delete, export, edit, regenerate, and stop.
 - Allowlisted Azure deployments and configurable thinking effort.
+- Built-in Responses API web search: automatic when useful, or explicitly selected from the attachment menu. Live search activity, clickable inline citations, and saved source lists. Your Azure deployments must support the `web_search` tool.
+- English and Turkish interface, selected in Settings and saved to the account across devices. The preferred language also guides text and voice replies.
+- Paste clipboard images into the composer, use **Paste image** from the attachment menu, or drop photos/files onto the chat on desktop. Pending images show private thumbnails; large images are resized before upload. Clipboard access depends on browser support and permission.
 - **Take photo** in the attachment menu opens native camera capture on supported phones (rear camera preferred). Photos are oriented by the browser, resized to a maximum 2,048 px edge, and encoded as JPEG within the upload limit. Desktop browsers may show an image picker instead.
 - PDF, JPEG, PNG, WebP, and UTF-8 text/code uploads: 3 MB per file, four per message, 12 MB per conversation context.
 - Optional Azure realtime voice over WebRTC, plus device text-to-speech for reading replies.
@@ -73,13 +76,13 @@ The repository’s daily Vercel cron calls `/api/maintenance`, protected by `CRO
 - Mutations enforce the configured origin; WebAuthn validates origin, RP ID, challenge, signature, and required user verification. Invitations are consumed in the same atomic transaction that enrolls the account/key.
 - Model input and uploaded filenames are untrusted. Only validated file formats are accepted. Downloads are attachments, not executable web content. Markdown does not execute raw HTML or load remote tracking images.
 - CSP uses per-request nonces. Private documents and APIs use `no-store`; the service worker caches only a generic offline page, manifest, and icons. No chat or session token is kept in browser localStorage.
-- Shared, durable rate limits: 150 text requests per account per UTC day, 12 per minute, 30 uploads per hour, 10 voice starts per UTC day. Output is capped at 8,192 tokens per text request. Authentication attempts and invitation creation also have limits.
+- Shared, durable rate limits: 150 text requests per account per UTC day, 12 per minute, 30 uploads per hour, 10 voice starts per UTC day. Output is capped at 8,192 tokens and up to six built-in tool calls per text request. Web searches incur provider tool charges. Authentication attempts and invitation creation also have limits.
 
 ## Practical limits
 
 - Voice sessions are separate from text chats and are not saved. The app ends voice after ten minutes; this is a client timer, not a provider billing ceiling. A signed-in user can modify their client. Use Azure quotas and billing alerts for a hard operational spending boundary.
 - Revocation prevents new requests; it cannot retract data already viewed or immediately terminate an established peer-to-peer voice connection.
-- There is no live web search, code execution sandbox, image generation, or long-term model memory. Word/Excel/PowerPoint attachments are not accepted; export them to PDF or CSV/text first.
+- There is no code execution sandbox, image generation, or long-term model memory. This app uses Azure Responses with built-in web search, not the managed Codex harness. The OpenAI Agents API is a separate integration with its own authentication and environment requirements; identical ChatGPT/Codex capabilities or latency are not promised. Word/Excel/PowerPoint attachments are not accepted; export them to PDF or CSV/text first.
 - PDF/image support depends on the configured Azure model. Azure service retention, abuse monitoring, and regional processing remain subject to your Azure configuration; `store:false` does not imply zero provider retention.
 - This remains a web app, not a UIKit application. The operating system controls keyboard animation, dictation, selection, and native pickers. Home Screen mode removes browser chrome; a physical device check is needed to assess those platform interactions.
 - The app needs connectivity for chat. It is not an offline inference client. Device passkeys, microphone permissions, audio autoplay, and Home Screen installation need a real-device check on your target iOS/Android version.
@@ -93,7 +96,7 @@ npm run build
 npm audit --audit-level=high
 ```
 
-The unit suite covers authenticated encryption and token generation. Before a production release, also run real-browser passkey enrollment/login/replay checks, a two-account authorization and revocation test, live Azure text and attachment requests, secure-cookie and CSP inspection, mobile/desktop rendering, and voice negotiation. Use disposable identities and delete test data after verification. Test fixtures, production secrets, activation links, deployment addresses, and private QA outputs do not belong in the repository.
+The unit suite covers authenticated encryption, token generation, session renewal, and citation URL/range handling. Before a production release, also run real-browser passkey enrollment/login/replay checks, a two-account authorization and revocation test, live Azure text and attachment requests, secure-cookie and CSP inspection, mobile/desktop rendering, and voice negotiation. Use disposable identities and delete test data after verification. Test fixtures, production secrets, activation links, deployment addresses, and private QA outputs do not belong in the repository.
 
 ## Branding assets
 

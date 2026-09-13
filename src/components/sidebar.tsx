@@ -1,4 +1,5 @@
 "use client";
+import { useI18n } from "./language-provider";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import {
   Search,
@@ -32,6 +33,7 @@ export default function Sidebar({
   onSelect: (id: string) => void;
   onSettings: () => void;
 }) {
+  const { t, language } = useI18n();
   const [search, setSearch] = useState("");
   const [now] = useState(() => Date.now());
   const mobile = useMobile();
@@ -71,14 +73,16 @@ export default function Sidebar({
     };
   }, [open, mobile]);
   const filtered = chats.filter((c) =>
-    c.title.toLocaleLowerCase().includes(search.toLocaleLowerCase()),
+    c.title
+      .toLocaleLowerCase(language)
+      .includes(search.toLocaleLowerCase(language)),
   );
   let previous = "";
   return (
     <>
       <button
         className={`sidebar-backdrop ${open ? "visible" : ""}`}
-        aria-label="Close chat history"
+        aria-label={t("Close chat history")}
         onClick={onClose}
         tabIndex={open ? 0 : -1}
       />
@@ -109,7 +113,7 @@ export default function Sidebar({
           gesture.current = null;
         }}
         className={`sidebar ${open ? "open" : ""}`}
-        aria-label="Chat history"
+        aria-label={t("Chat history")}
         inert={!open && mobile ? true : undefined}
         aria-hidden={!open && mobile ? true : undefined}
       >
@@ -119,7 +123,7 @@ export default function Sidebar({
             <span>ChatGPT</span>
           </div>
           <IconButton
-            label="Close sidebar"
+            label={t("Close sidebar")}
             className="mobile-only"
             onClick={onClose}
           >
@@ -128,13 +132,13 @@ export default function Sidebar({
         </div>
         <button className="sidebar-action" onClick={onNew} disabled={busy}>
           <SquarePen size={20} />
-          New chat
+          {t("New chat")}
         </button>
         <label className="search-box">
           <Search size={19} />
           <input
-            placeholder="Search chats"
-            aria-label="Search chats"
+            placeholder={t("Search chats")}
+            aria-label={t("Search chats")}
             type="search"
             enterKeyHint="search"
             autoComplete="off"
@@ -148,12 +152,12 @@ export default function Sidebar({
             filtered.map((c) => {
               const day = new Date(c.updatedAt).toDateString();
               const group = c.pinned
-                ? "Pinned"
+                ? t("Pinned")
                 : day === new Date(now).toDateString()
-                  ? "Today"
+                  ? t("Today")
                   : now - Date.parse(c.updatedAt) < 7 * 86400000
-                    ? "Previous 7 days"
-                    : "Earlier";
+                    ? t("Previous 7 days")
+                    : t("Earlier");
               const heading = group !== previous;
               previous = group;
               return (
@@ -175,8 +179,8 @@ export default function Sidebar({
               <MessageCircle size={24} />
               <p>
                 {search
-                  ? "No matching chats"
-                  : "Your conversations will appear here."}
+                  ? t("No matching chats")
+                  : t("Your conversations will appear here.")}
               </p>
             </div>
           )}
@@ -189,8 +193,8 @@ export default function Sidebar({
             <strong>{person.name}</strong>
             <small>
               {person.role === "owner"
-                ? "Personal account"
-                : "Personal account"}
+                ? t("Personal account")
+                : t("Personal account")}
             </small>
           </span>
           <Settings size={18} />

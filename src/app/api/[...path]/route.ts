@@ -19,7 +19,7 @@ import {
 } from "@/lib/server/files";
 import { voice } from "@/lib/server/voice";
 import { maintenance } from "@/lib/server/maintenance";
-import type { ConversationSummary, Person } from "@/lib/types";
+import type { ConversationSummary, Person, Preferences } from "@/lib/types";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 240;
@@ -47,8 +47,23 @@ async function handle(req: NextRequest, context: Context) {
     }
     const current = await auth.session(req);
     const user = current.person;
-    if (method === "GET" && path === "me")
-      return json({ person: user, models: models(), voice: voiceAvailable() });
+    if (method === "GET" && path === "me") {
+      const preferences = await db.get<Preferences>(user.id, "preferences");
+      return json({
+        person: user,
+        models: models(),
+        voice: voiceAvailable(),
+        preferences: preferences?.value ?? { language: "en" },
+      });
+    }
+    if (method === "PATCH" && path === "preferences") {
+      const preferences = await body(
+        req,
+        z.object({ language: z.enum(["en", "tr"]) }).strict(),
+      );
+      await db.put(user.id, "preferences", preferences);
+      return json(preferences);
+    }
     if (method === "GET" && path === "chats") {
       const rows = await db.list<ConversationSummary>(user.id, "chat_");
       return json(

@@ -1,4 +1,5 @@
 "use client";
+import { LanguageProvider, useI18n } from "./language-provider";
 import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import {
@@ -16,6 +17,7 @@ import {
   BookOpen,
   Code2,
   Compass,
+  Upload,
 } from "lucide-react";
 import type {
   Attachment,
@@ -34,7 +36,12 @@ import { ActionMenu, IconButton, Mark, Modal, Spinner } from "./ui";
 import { dismissKeyboard, useMobile, useMobileViewport } from "@/lib/mobile";
 const Settings = dynamic(() => import("./settings"));
 const Voice = dynamic(() => import("./voice"));
-type Identity = { person: Person; models: Model[]; voice: boolean };
+type Identity = {
+  person: Person;
+  models: Model[];
+  voice: boolean;
+  preferences: { language: "en" | "tr" };
+};
 const suggestions = [
   {
     icon: Lightbulb,
@@ -61,7 +68,8 @@ const suggestions = [
       "I have an idea I’d like to think through. Help me explore it by asking a thoughtful first question.",
   },
 ];
-export default function ChatApp() {
+function ChatApp() {
+  const { t, setLanguage } = useI18n();
   useMobileViewport();
   const mobile = useMobile();
   const [identity, setIdentity] = useState<Identity | null>(null),
@@ -77,6 +85,9 @@ export default function ChatApp() {
     [reasoning, setReasoning] = useState("medium"),
     [busy, setBusy] = useState(false),
     [uploading, setUploading] = useState(false),
+    [search, setSearch] = useState(false),
+    [activity, setActivity] = useState<"searching" | "reading" | null>(null),
+    [dragging, setDragging] = useState(false),
     [error, setError] = useState(""),
     [sidebar, setSidebar] = useState(false),
     [modelMenu, setModelMenu] = useState(false),
@@ -89,8 +100,34 @@ export default function ChatApp() {
     [rename, setRename] = useState<string | null>(null),
     [confirmDelete, setConfirmDelete] = useState(false),
     [offline, setOffline] = useState(false);
+  const uploadLock = useRef(false);
+  const dragDepth = useRef(0);
   const abort = useRef<AbortController | null>(null);
   const streamingId = useRef<string | null>(null);
+  useEffect(() => {
+    function preventFileNavigation(e: DragEvent) {
+      if (Array.from(e.dataTransfer?.types ?? []).includes("Files"))
+        e.preventDefault();
+      if (e.type === "drop" || e.type === "dragend") {
+        dragDepth.current = 0;
+        setDragging(false);
+      }
+    }
+    function clearDrag() {
+      dragDepth.current = 0;
+      setDragging(false);
+    }
+    window.addEventListener("dragover", preventFileNavigation);
+    window.addEventListener("drop", preventFileNavigation);
+    window.addEventListener("dragend", clearDrag);
+    window.addEventListener("blur", clearDrag);
+    return () => {
+      window.removeEventListener("dragover", preventFileNavigation);
+      window.removeEventListener("drop", preventFileNavigation);
+      window.removeEventListener("dragend", clearDrag);
+      window.removeEventListener("blur", clearDrag);
+    };
+  }, []);
   async function refreshChats() {
     setChats(await api<ConversationSummary[]>("chats"));
   }
@@ -99,6 +136,7 @@ export default function ChatApp() {
     try {
       const me = await api<Identity>("me");
       setIdentity(me);
+      setLanguage(me.preferences.language);
       setModel((current) =>
         me.models.some((m) => m.id === current) ? current : me.models[0].id,
       );
@@ -144,7 +182,7 @@ export default function ChatApp() {
         setTimeout(
           () =>
             document
-              .querySelector<HTMLInputElement>('[aria-label="Search chats"]')
+              .querySelector<HTMLInputElement>(".search-box input")
               ?.focus(),
           100,
         );
@@ -182,6 +220,8 @@ export default function ChatApp() {
     setText("");
     setFiles([]);
     setTemporary(temp);
+    setSearch(false);
+    setActivity(null);
     setEditing(null);
     setError("");
     setSidebar(false);
@@ -206,25 +246,48 @@ export default function ChatApp() {
     }
   }
   async function upload(list: FileList | File[], camera = false) {
-    if (temporary || busy || uploading) return;
+    if (temporary) {
+      setError(t("Attachments are available in saved chats."));
+      return;
+    }
+    if (busy || uploadLock.current) {
+      setError(t("Finish the current upload or response before adding files."));
+      return;
+    }
     const selected = Array.from(list);
     if (selected.length + files.length > 4) {
       setError("Attach up to four files per message.");
       return;
     }
+    uploadLock.current = true;
     setUploading(true);
     setError("");
     try {
       for (const source of selected) {
-        const f = camera
-          ? await (
-              await import("@/lib/camera-photo")
-            ).prepareCameraPhoto(source)
-          : source;
+        const f =
+          camera ||
+          (source.type.startsWith("image/") &&
+            (source.size > 3 * 1024 * 1024 ||
+              !["image/jpeg", "image/png", "image/webp"].includes(source.type)))
+            ? await (
+                await import("@/lib/camera-photo")
+              ).prepareCameraPhoto(source)
+            : source;
         if (f.size > 3 * 1024 * 1024)
           throw new Error("Files can be up to 3 MB each.");
         const form = new FormData();
-        form.append("file", f);
+        const extension = (
+          {
+            "image/png": "png",
+            "image/jpeg": "jpg",
+            "image/webp": "webp",
+          } as Record<string, string>
+        )[f.type];
+        const filename =
+          extension && !/\.(png|jpe?g|webp)$/i.test(f.name)
+            ? `image-${Date.now()}.${extension}`
+            : f.name;
+        form.append("file", f, filename);
         const r = await fetch("/api/files", { method: "POST", body: form });
         const result = await r.json();
         if (!r.ok) throw new Error(result.error || "The upload failed.");
@@ -233,6 +296,7 @@ export default function ChatApp() {
     } catch (e) {
       setError(errorMessage(e));
     } finally {
+      uploadLock.current = false;
       setUploading(false);
     }
   }
@@ -249,6 +313,7 @@ export default function ChatApp() {
     if (!prompt) return;
     setError("");
     setBusy(true);
+    setActivity(null);
     if (!retry) setText("");
     setModelMenu(false);
     const previous = messages;
@@ -300,6 +365,7 @@ export default function ChatApp() {
           files: files.map((f) => f.id),
           model,
           reasoning,
+          search,
           temporary,
           temporaryMessages: temporary
             ? previous.map(({ role, content }) => ({ role, content }))
@@ -335,6 +401,30 @@ export default function ChatApp() {
             started = true;
             streamingId.current = event.conversationId;
             if (!temporary) setActive(event.conversationId);
+          }
+          if (event.type === "search") setActivity(event.status);
+          if (event.type === "sources")
+            setMessages((current) =>
+              current.map((m) =>
+                m.id === responseId
+                  ? { ...m, sources: event.sources, searched: true }
+                  : m,
+              ),
+            );
+          if (event.type === "result") {
+            setActivity(null);
+            setMessages((current) =>
+              current.map((m) =>
+                m.id === responseId
+                  ? {
+                      ...m,
+                      content: event.text,
+                      sources: event.sources,
+                      searched: event.searched,
+                    }
+                  : m,
+              ),
+            );
           }
           if (event.type === "delta")
             setMessages((current) =>
@@ -385,6 +475,7 @@ export default function ChatApp() {
         }
       }
       abort.current = null;
+      setActivity(null);
       setBusy(false);
     }
   }
@@ -422,15 +513,15 @@ export default function ChatApp() {
     return (
       <div className="loading-screen">
         <Spinner />
-        <span>Opening your space…</span>
+        <span>{t("Opening your space…")}</span>
       </div>
     );
   if (bootError)
     return (
       <main className="loading-screen">
-        <p role="alert">{bootError}</p>
+        <p role="alert">{t(bootError)}</p>
         <button className="primary" onClick={boot}>
-          Try again
+          {t("Try again")}
         </button>
       </main>
     );
@@ -463,10 +554,52 @@ export default function ChatApp() {
           setSidebar(false);
         }}
       />
-      <main className="chat-main" inert={mobile && sidebar ? true : undefined}>
+      <main
+        className="chat-main"
+        inert={mobile && sidebar ? true : undefined}
+        onDragEnter={(e) => {
+          if (!Array.from(e.dataTransfer.types).includes("Files")) return;
+          e.preventDefault();
+          dragDepth.current += 1;
+          setDragging(true);
+        }}
+        onDragOver={(e) => {
+          if (!Array.from(e.dataTransfer.types).includes("Files")) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect =
+            temporary || busy || uploading ? "none" : "copy";
+        }}
+        onDragLeave={(e) => {
+          if (!Array.from(e.dataTransfer.types).includes("Files")) return;
+          dragDepth.current = Math.max(0, dragDepth.current - 1);
+          if (!dragDepth.current) setDragging(false);
+        }}
+        onDrop={(e) => {
+          if (!Array.from(e.dataTransfer.types).includes("Files")) return;
+          e.preventDefault();
+          dragDepth.current = 0;
+          setDragging(false);
+          if (e.dataTransfer.files.length) void upload(e.dataTransfer.files);
+        }}
+      >
+        {dragging ? (
+          <div className="drop-overlay">
+            <Upload size={38} />
+            <strong>{t("Drop photos or files here")}</strong>
+            <span>
+              {t(
+                temporary
+                  ? "Attachments are available in saved chats."
+                  : busy || uploading
+                    ? "Finish the current upload or response before adding files."
+                    : "Add a question, then send.",
+              )}
+            </span>
+          </div>
+        ) : null}
         <header className="chat-header">
           <IconButton
-            label="Open sidebar"
+            label={t("Open sidebar")}
             className="mobile-only"
             onClick={() => {
               dismissKeyboard();
@@ -482,7 +615,9 @@ export default function ChatApp() {
                 dismissKeyboard();
                 setModelMenu(!modelMenu);
               }}
-              aria-label={`Choose model, current ${selectedModel.label}`}
+              aria-label={t("Choose model, current {model}", {
+                model: selectedModel.label,
+              })}
               aria-haspopup="dialog"
               aria-expanded={modelMenu}
               disabled={busy}
@@ -495,7 +630,7 @@ export default function ChatApp() {
             </button>
             {modelMenu ? (
               <ActionMenu
-                title="Choose a model"
+                title={t("Choose a model")}
                 className="model-menu"
                 onClose={() => setModelMenu(false)}
               >
@@ -511,35 +646,35 @@ export default function ChatApp() {
                   >
                     <div>
                       <strong>{m.label}</strong>
-                      <span>{m.description}</span>
+                      <span>{t(m.description)}</span>
                     </div>
                     {m.id === model ? <Check size={18} /> : null}
                   </button>
                 ))}
                 {selectedModel.reasoning ? (
                   <div className="reasoning-option">
-                    <label htmlFor="reasoning">Thinking effort</label>
+                    <label htmlFor="reasoning">{t("Thinking effort")}</label>
                     <select
                       id="reasoning"
                       value={reasoning}
                       onChange={(e) => setReasoning(e.target.value)}
                     >
-                      <option value="low">Quick</option>
-                      <option value="medium">Balanced</option>
-                      <option value="high">Deep</option>
+                      <option value="low">{t("Quick")}</option>
+                      <option value="medium">{t("Balanced")}</option>
+                      <option value="high">{t("Deep")}</option>
                     </select>
                   </div>
                 ) : null}
-                <p>Available through your private Azure connection</p>
+                <p>{t("Available through your private Azure connection")}</p>
               </ActionMenu>
             ) : null}
           </div>
           <div className="header-right">
             {temporary ? (
-              <span className="temporary-label">Temporary</span>
+              <span className="temporary-label">{t("Temporary")}</span>
             ) : null}
             <IconButton
-              label="Temporary chat"
+              label={t("Temporary chat")}
               className={`${temporary ? "is-active" : ""} desktop-only`}
               disabled={busy}
               onClick={() => newChat(!temporary)}
@@ -547,7 +682,7 @@ export default function ChatApp() {
               <MessageCircleDashed size={22} />
             </IconButton>
             <IconButton
-              label="New chat"
+              label={t("New chat")}
               onClick={() => newChat()}
               disabled={busy}
             >
@@ -555,7 +690,7 @@ export default function ChatApp() {
             </IconButton>
             <div className="more-wrap">
               <IconButton
-                label="Chat options"
+                label={t("Chat options")}
                 onClick={() => {
                   dismissKeyboard();
                   setMoreMenu(!moreMenu);
@@ -568,7 +703,7 @@ export default function ChatApp() {
               </IconButton>
               {moreMenu ? (
                 <ActionMenu
-                  title="Chat options"
+                  title={t("Chat options")}
                   className="more-menu"
                   onClose={() => setMoreMenu(false)}
                 >
@@ -581,7 +716,7 @@ export default function ChatApp() {
                         }}
                       >
                         <Pencil size={17} />
-                        Rename
+                        {t("Rename")}
                       </button>
                       <button
                         onClick={async () => {
@@ -597,7 +732,7 @@ export default function ChatApp() {
                         }}
                       >
                         <Pin size={17} />
-                        {current?.pinned ? "Unpin chat" : "Pin chat"}
+                        {current?.pinned ? t("Unpin chat") : t("Pin chat")}
                       </button>
                       <button
                         className="danger"
@@ -607,7 +742,7 @@ export default function ChatApp() {
                         }}
                       >
                         <Trash2 size={17} />
-                        Delete chat
+                        {t("Delete chat")}
                       </button>
                     </>
                   ) : null}
@@ -618,7 +753,7 @@ export default function ChatApp() {
                     }}
                   >
                     <MessageCircleDashed size={17} />
-                    {temporary ? "Saved chat" : "Temporary chat"}
+                    {temporary ? t("Saved chat") : t("Temporary chat")}
                   </button>
                   <button
                     onClick={() => {
@@ -626,7 +761,7 @@ export default function ChatApp() {
                       setMoreMenu(false);
                     }}
                   >
-                    Settings
+                    {t("Settings")}
                   </button>
                 </ActionMenu>
               ) : null}
@@ -635,7 +770,7 @@ export default function ChatApp() {
         </header>
         {offline ? (
           <div className="offline-banner" role="status">
-            You’re offline. Reconnect to send a message.
+            {t("You’re offline. Reconnect to send a message.")}
           </div>
         ) : null}
         {!messages.length ? (
@@ -651,27 +786,27 @@ export default function ChatApp() {
               ) : null}
               <h1>
                 {temporary
-                  ? "A little off the record."
-                  : "What’s on your mind?"}
+                  ? t("A little off the record.")
+                  : t("What’s on your mind?")}
               </h1>
               {temporary ? (
-                <p>This chat won’t appear in your history.</p>
+                <p>{t("This chat won’t appear in your history.")}</p>
               ) : (
                 <div className="suggestions">
                   {suggestions.map((s) => (
                     <button
-                      key={s.label}
+                      key={t(s.label)}
                       onClick={() => {
-                        setText(s.prompt);
+                        setText(t(s.prompt));
                         document
                           .querySelector<HTMLTextAreaElement>(
-                            '[aria-label="Message"]',
+                            ".composer textarea",
                           )
                           ?.focus({ preventScroll: true });
                       }}
                     >
                       <s.icon size={17} />
-                      {s.label}
+                      {t(s.label)}
                     </button>
                   ))}
                 </div>
@@ -683,21 +818,22 @@ export default function ChatApp() {
             key={active ?? "new"}
             messages={messages}
             busy={busy}
+            activity={activity}
             onRetry={() => send(true)}
             onEdit={(m) => {
               setEditing(m.id);
               setText(m.content);
               setFiles([]);
               document
-                .querySelector<HTMLTextAreaElement>('[aria-label="Message"]')
+                .querySelector<HTMLTextAreaElement>(".composer textarea")
                 ?.focus({ preventScroll: true });
             }}
           />
         )}
         {error ? (
           <div className="chat-error" role="alert">
-            <span>{error}</span>
-            <IconButton label="Dismiss error" onClick={() => setError("")}>
+            <span>{t(error)}</span>
+            <IconButton label={t("Dismiss error")} onClick={() => setError("")}>
               <X size={16} />
             </IconButton>
           </div>
@@ -707,6 +843,9 @@ export default function ChatApp() {
           setText={setText}
           files={files}
           onFiles={upload}
+          onError={setError}
+          search={search}
+          onSearch={() => setSearch(!search)}
           onCameraPhoto={(photo) => upload([photo], true)}
           onRemove={removeFile}
           onSend={() => send()}
@@ -741,7 +880,7 @@ export default function ChatApp() {
       ) : null}
       {voice ? <Voice onClose={() => setVoice(false)} /> : null}
       {rename !== null ? (
-        <Modal title="Rename chat" onClose={() => setRename(null)}>
+        <Modal title={t("Rename chat")} onClose={() => setRename(null)}>
           <form
             className="simple-form"
             onSubmit={(e) => {
@@ -750,35 +889,47 @@ export default function ChatApp() {
             }}
           >
             <input
-              aria-label="Chat name"
+              aria-label={t("Chat name")}
               value={rename}
               maxLength={100}
               onChange={(e) => setRename(e.target.value)}
               autoFocus
             />
-            <button className="primary">Save</button>
+            <button className="primary">{t("Save")}</button>
           </form>
         </Modal>
       ) : null}
       {confirmDelete ? (
-        <Modal title="Delete chat?" onClose={() => setConfirmDelete(false)}>
+        <Modal
+          title={t("Delete chat?")}
+          onClose={() => setConfirmDelete(false)}
+        >
           <div className="simple-form">
             <p>
-              This removes this conversation and its attachments. It cannot be
-              undone.
+              {t(
+                "This removes this conversation and its attachments. It cannot be undone.",
+              )}
             </p>
             <button className="primary danger-button" onClick={deleteChat}>
-              Delete chat
+              {t("Delete chat")}
             </button>
             <button
               className="secondary"
               onClick={() => setConfirmDelete(false)}
             >
-              Keep chat
+              {t("Keep chat")}
             </button>
           </div>
         </Modal>
       ) : null}
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <LanguageProvider>
+      <ChatApp />
+    </LanguageProvider>
   );
 }

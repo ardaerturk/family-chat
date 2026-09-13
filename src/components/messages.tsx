@@ -1,4 +1,5 @@
 "use client";
+import { useI18n } from "./language-provider";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -10,17 +11,20 @@ import {
   Volume2,
   FileText,
   ChevronDown,
+  Globe,
 } from "lucide-react";
 import type { Message } from "@/lib/types";
 import { IconButton, Mark } from "./ui";
+import { safeSourceUrl } from "@/lib/web-search";
 import { dismissKeyboard } from "@/lib/mobile";
 function CodeBlock({ children }: { children: React.ReactNode }) {
+  const { t } = useI18n();
   const ref = useRef<HTMLPreElement>(null),
     [copied, setCopied] = useState(false);
   return (
     <div className="code-block">
       <div className="code-header">
-        <span>Code</span>
+        <span>{t("Code")}</span>
         <button
           onClick={async () => {
             await navigator.clipboard.writeText(ref.current?.textContent ?? "");
@@ -29,7 +33,7 @@ function CodeBlock({ children }: { children: React.ReactNode }) {
           }}
         >
           {copied ? <Check size={14} /> : <Copy size={14} />}{" "}
-          {copied ? "Copied" : "Copy"}
+          {copied ? t("Copied") : t("Copy")}
         </button>
       </div>
       <pre ref={ref}>{children}</pre>
@@ -39,14 +43,17 @@ function CodeBlock({ children }: { children: React.ReactNode }) {
 export default function Messages({
   messages,
   busy,
+  activity,
   onRetry,
   onEdit,
 }: {
   messages: Message[];
   busy: boolean;
+  activity: "searching" | "reading" | null;
   onRetry: () => void;
   onEdit: (m: Message) => void;
 }) {
+  const { t } = useI18n();
   const content = useRef<HTMLDivElement>(null),
     area = useRef<HTMLDivElement>(null),
     [follow, setFollow] = useState(true),
@@ -158,8 +165,21 @@ export default function Messages({
           <article
             className={`message ${m.role}`}
             key={m.id}
-            aria-label={m.role === "user" ? "You" : "Assistant"}
+            aria-label={m.role === "user" ? t("You") : t("Assistant")}
           >
+            {m.role === "assistant" &&
+            busy &&
+            index === messages.length - 1 &&
+            activity ? (
+              <div className="search-activity" role="status">
+                <Globe size={17} className="search-pulse" />
+                {t(
+                  activity === "searching"
+                    ? "Searching the web…"
+                    : "Reading sources…",
+                )}
+              </div>
+            ) : null}
             <div className="message-content">
               {m.role === "user" ? (
                 <>
@@ -199,40 +219,65 @@ export default function Messages({
                         ),
                         img: ({ alt }) => (
                           <span className="muted">
-                            [Image: {alt || "external image"}]
+                            [{t("Image")}: {alt || t("external image")}]
                           </span>
                         ),
                       }}
                     >
                       {m.content}
                     </Markdown>
-                  ) : busy && index === messages.length - 1 ? (
+                  ) : busy && index === messages.length - 1 && !activity ? (
                     <div className="thinking">
                       <Mark size={22} />
                       <span>
-                        Thinking<span className="thinking-dots">…</span>
+                        {t("Thinking")}
+                        <span className="thinking-dots">…</span>
                       </span>
                     </div>
-                  ) : (
+                  ) : busy && activity ? null : (
                     <span className="muted">
                       {m.status === "error"
-                        ? "Couldn’t generate a response. Try again."
-                        : "Response stopped."}
+                        ? t("Couldn’t generate a response. Try again.")
+                        : t("Response stopped.")}
                     </span>
                   )}
                 </div>
               )}
             </div>
+            {m.sources?.length ? (
+              <details className="message-sources">
+                <summary>
+                  <Globe size={15} />
+                  {t("Sources")} · {m.sources.length}
+                </summary>
+                <ol>
+                  {m.sources
+                    .filter((source) => safeSourceUrl(source.url))
+                    .map((source) => (
+                      <li key={source.url}>
+                        <a
+                          href={source.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <strong>{source.title}</strong>
+                          <span>{new URL(source.url).hostname}</span>
+                        </a>
+                      </li>
+                    ))}
+                </ol>
+              </details>
+            ) : null}
             {!(busy && index === messages.length - 1) && (
               <div
                 className={`message-actions ${m.role === "user" ? "user-actions" : ""}`}
               >
-                <IconButton label="Copy message" onClick={() => copy(m)}>
+                <IconButton label={t("Copy message")} onClick={() => copy(m)}>
                   {copied === m.id ? <Check size={16} /> : <Copy size={16} />}
                 </IconButton>
                 {m.role === "user" ? (
                   <IconButton
-                    label="Edit message"
+                    label={t("Edit message")}
                     disabled={busy}
                     onClick={() => onEdit(m)}
                   >
@@ -241,14 +286,16 @@ export default function Messages({
                 ) : (
                   <>
                     <IconButton
-                      label={speaking === m.id ? "Stop reading" : "Read aloud"}
+                      label={
+                        speaking === m.id ? t("Stop reading") : t("Read aloud")
+                      }
                       onClick={() => speak(m)}
                     >
                       <Volume2 size={17} />
                     </IconButton>
                     {index === messages.length - 1 ? (
                       <IconButton
-                        label="Regenerate response"
+                        label={t("Regenerate response")}
                         disabled={busy}
                         onClick={onRetry}
                       >
@@ -256,7 +303,9 @@ export default function Messages({
                       </IconButton>
                     ) : null}
                     <span className="message-model">{m.model}</span>
-                    {m.status === "stopped" ? <small>Stopped</small> : null}
+                    {m.status === "stopped" ? (
+                      <small>{t("Stopped")}</small>
+                    ) : null}
                   </>
                 )}
               </div>
@@ -266,7 +315,7 @@ export default function Messages({
       </div>
       {!follow ? (
         <IconButton
-          label="Scroll to latest message"
+          label={t("Scroll to latest message")}
           className="scroll-bottom"
           onClick={() => {
             following.current = true;

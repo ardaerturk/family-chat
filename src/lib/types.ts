@@ -17,11 +17,15 @@ export type Attachment = {
   mime: string;
   size: number;
 };
+export type Source = { url: string; title: string };
+export type Preferences = { language: "en" | "tr" };
 export type Message = {
   id: string;
   role: "user" | "assistant";
   content: string;
   files?: Attachment[];
+  sources?: Source[];
+  searched?: boolean;
   model?: string;
   status?: "complete" | "stopped" | "error";
   createdAt: string;

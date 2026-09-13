@@ -1,4 +1,5 @@
 "use client";
+import { useI18n } from "./language-provider";
 import { useRef, useEffect, useLayoutEffect, useState } from "react";
 import {
   Plus,
@@ -9,17 +10,23 @@ import {
   FileText,
   Paperclip,
   Camera,
-  Image as ImageIcon,
+  Globe,
+  ClipboardPaste,
   Keyboard,
 } from "lucide-react";
 import type { Attachment } from "@/lib/types";
 import { ActionMenu, IconButton, Spinner } from "./ui";
+import { clipboardImages } from "@/lib/clipboard";
+import AttachmentThumbnail from "./attachment-thumbnail";
 import { dismissKeyboard } from "@/lib/mobile";
 export default function Composer({
   text,
   setText,
   files,
   onFiles,
+  onError,
+  search,
+  onSearch,
   onCameraPhoto,
   onRemove,
   onSend,
@@ -35,7 +42,10 @@ export default function Composer({
   text: string;
   setText: (s: string) => void;
   files: Attachment[];
-  onFiles: (f: FileList) => void;
+  onFiles: (f: FileList | File[]) => void;
+  onError: (message: string) => void;
+  search: boolean;
+  onSearch: () => void;
   onCameraPhoto: (photo: File) => void;
   onRemove: (id: string) => void;
   onSend: () => void;
@@ -48,6 +58,7 @@ export default function Composer({
   editing: boolean;
   onCancelEdit: () => void;
 }) {
+  const { t } = useI18n();
   const areaRef = useRef<HTMLDivElement>(null);
   const ref = useRef<HTMLTextAreaElement>(null),
     fileRef = useRef<HTMLInputElement>(null),
@@ -92,10 +103,23 @@ export default function Composer({
   }
   return (
     <div className="composer-area" ref={areaRef}>
+      {search ? (
+        <div className="composer-mode">
+          <Globe size={15} />
+          <span>{t("Search the web")}</span>
+          <IconButton
+            label={t("Automatic search")}
+            onClick={onSearch}
+            disabled={busy}
+          >
+            <X size={15} />
+          </IconButton>
+        </div>
+      ) : null}
       {editing ? (
         <div className="edit-banner">
-          Editing message
-          <IconButton label="Cancel edit" onClick={onCancelEdit}>
+          {t("Editing message")}
+          <IconButton label={t("Cancel edit")} onClick={onCancelEdit}>
             <X size={16} />
           </IconButton>
         </div>
@@ -106,10 +130,27 @@ export default function Composer({
           e.preventDefault();
           if (!busy && !uploading && text.trim()) onSend();
         }}
-        onDragOver={(e) => e.preventDefault()}
-        onDrop={(e) => {
+        onPaste={(e) => {
+          const images = clipboardImages(e.clipboardData);
+          if (!images.length) return;
           e.preventDefault();
-          if (!busy && !uploading && !temporary) onFiles(e.dataTransfer.files);
+          if (busy || uploading) {
+            onError(
+              t("Finish the current upload or response before adding files."),
+            );
+            return;
+          }
+          if (temporary) {
+            onError(t("Attachments are available in saved chats."));
+            return;
+          }
+          const pastedText = e.clipboardData.getData("text/plain");
+          if (pastedText && e.target === ref.current) {
+            const start = ref.current?.selectionStart ?? text.length;
+            const end = ref.current?.selectionEnd ?? text.length;
+            setText(text.slice(0, start) + pastedText + text.slice(end));
+          }
+          onFiles(images);
         }}
       >
         {files.length || uploading ? (
@@ -120,7 +161,7 @@ export default function Composer({
                   className={`file-icon ${f.mime.startsWith("image/") ? "image" : ""}`}
                 >
                   {f.mime.startsWith("image/") ? (
-                    <ImageIcon size={21} />
+                    <AttachmentThumbnail file={f} />
                   ) : (
                     <FileText size={21} />
                   )}
@@ -130,7 +171,7 @@ export default function Composer({
                   <small>{(f.size / 1024).toFixed(0)} KB</small>
                 </span>
                 <IconButton
-                  label={`Remove ${f.name}`}
+                  label={t("Remove {name}", { name: f.name })}
                   onClick={() => onRemove(f.id)}
                   disabled={busy}
                 >
@@ -140,15 +181,15 @@ export default function Composer({
             ))}
             {uploading ? (
               <span className="uploading">
-                <Spinner /> Uploading…
+                <Spinner /> {t("Uploading…")}
               </span>
             ) : null}
           </div>
         ) : null}
         <textarea
           ref={ref}
-          aria-label="Message"
-          placeholder="Ask anything"
+          aria-label={t("Message")}
+          placeholder={t("Ask anything")}
           value={text}
           onChange={(e) => setText(e.target.value)}
           rows={1}
@@ -172,8 +213,8 @@ export default function Composer({
         <div className="composer-toolbar">
           <div className="attachment-menu-wrap">
             <IconButton
-              label="Add attachments"
-              disabled={busy || uploading || temporary || files.length >= 4}
+              label={t("Add attachments")}
+              disabled={busy || uploading}
               onClick={() => {
                 dismissKeyboard();
                 setMenu(!menu);
@@ -185,34 +226,84 @@ export default function Composer({
             </IconButton>
             {menu ? (
               <ActionMenu
-                title="Add attachments"
+                title={t("Add attachments")}
                 className="attachment-menu"
                 onClose={() => setMenu(false)}
               >
                 <button
                   type="button"
+                  aria-pressed={search}
+                  onClick={() => {
+                    onSearch();
+                    setMenu(false);
+                  }}
+                >
+                  <Globe size={18} />
+                  {t("Search the web")}
+                </button>
+                <button
+                  type="button"
+                  disabled={temporary || files.length >= 4}
+                  onClick={async (e) => {
+                    e.currentTarget.closest("dialog")?.close();
+                    setMenu(false);
+                    try {
+                      if (!navigator.clipboard?.read)
+                        throw new Error("unsupported");
+                      const items = await navigator.clipboard.read();
+                      const photos: File[] = [];
+                      for (const item of items) {
+                        const type = item.types.find((type) =>
+                          type.startsWith("image/"),
+                        );
+                        if (type) {
+                          const blob = await item.getType(type);
+                          photos.push(
+                            new File([blob], "clipboard-image", { type }),
+                          );
+                        }
+                      }
+                      if (!photos.length)
+                        onError(t("There is no image on the clipboard."));
+                      else onFiles(photos);
+                    } catch {
+                      onError(
+                        t(
+                          "Clipboard access is unavailable. Paste into the message field or add a photo instead.",
+                        ),
+                      );
+                    }
+                  }}
+                >
+                  <ClipboardPaste size={18} />
+                  {t("Paste image")}
+                </button>
+                <button
+                  type="button"
+                  disabled={temporary || files.length >= 4}
                   onClick={(e) => {
                     e.currentTarget.closest("dialog")?.close();
                     cameraRef.current?.click();
                     setMenu(false);
                   }}
                 >
-                  <Camera size={18} /> Take photo
+                  <Camera size={18} /> {t("Take photo")}
                 </button>
                 <button
                   type="button"
+                  disabled={temporary || files.length >= 4}
                   onClick={(e) => {
                     e.currentTarget.closest("dialog")?.close();
                     fileRef.current?.click();
                     setMenu(false);
                   }}
                 >
-                  <Paperclip size={18} /> Add photos & files
+                  <Paperclip size={18} /> {t("Add photos & files")}
                 </button>
                 <p>
-                  PDF, images, text & code
+                  {t("PDF, images, text & code")}
                   <br />
-                  Up to 3 MB each · 4 files per message
+                  {t("Up to 3 MB each · 4 files per message")}
                 </p>
               </ActionMenu>
             ) : null}
@@ -222,7 +313,7 @@ export default function Composer({
             className="sr-only"
             tabIndex={-1}
             type="file"
-            aria-label="Take a photo with your camera"
+            aria-label={t("Take a photo with your camera")}
             accept="image/*"
             capture="environment"
             disabled={busy || uploading || temporary || files.length >= 4}
@@ -237,7 +328,7 @@ export default function Composer({
             className="sr-only"
             tabIndex={-1}
             type="file"
-            aria-label="Upload files"
+            aria-label={t("Upload files")}
             multiple
             accept=".pdf,.jpg,.jpeg,.png,.webp,.txt,.md,.csv,.tsv,.json,.py,.js,.ts,.tsx,.jsx,.css,.html,.xml,.yaml,.yml,.log,.sql"
             onChange={(e) => {
@@ -247,7 +338,7 @@ export default function Composer({
           />
           <div className="composer-right">
             <IconButton
-              label="Hide keyboard"
+              label={t("Hide keyboard")}
               className="keyboard-dismiss"
               onClick={dismissKeyboard}
             >
@@ -255,7 +346,7 @@ export default function Composer({
             </IconButton>
             {voice && !text && !busy ? (
               <IconButton
-                label="Start voice conversation"
+                label={t("Start voice conversation")}
                 className="voice-button"
                 onClick={onVoice}
               >
@@ -264,7 +355,7 @@ export default function Composer({
             ) : null}
             {busy ? (
               <IconButton
-                label="Stop generating"
+                label={t("Stop generating")}
                 className="send-button"
                 onClick={onStop}
                 onPointerDown={keepKeyboard}
@@ -275,7 +366,7 @@ export default function Composer({
               <button
                 className="send-button icon-button"
                 type="submit"
-                aria-label="Send message"
+                aria-label={t("Send message")}
                 disabled={!text.trim() || uploading}
                 onPointerDown={keepKeyboard}
               >
@@ -287,8 +378,8 @@ export default function Composer({
       </form>
       <p className="composer-disclaimer">
         {temporary
-          ? "Temporary chat · not saved to your history"
-          : "AI can make mistakes. Check important information."}
+          ? t("Temporary chat · not saved to your history")
+          : t("AI can make mistakes. Check important information.")}
       </p>
     </div>
   );

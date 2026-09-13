@@ -1,4 +1,5 @@
 "use client";
+import { useI18n } from "./language-provider";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useMobile } from "@/lib/mobile";
@@ -25,13 +26,14 @@ export function IconButton({
   children,
   ...props
 }: React.ButtonHTMLAttributes<HTMLButtonElement> & { label: string }) {
+  const { t } = useI18n();
   return (
     <button
       type="button"
       {...props}
       className={`icon-button ${props.className ?? ""}`}
-      aria-label={label}
-      title={label}
+      aria-label={t(label)}
+      title={t(label)}
     >
       {children}
     </button>
@@ -48,6 +50,7 @@ export function Modal({
   onClose: () => void;
   className?: string;
 }) {
+  const { t } = useI18n();
   const ref = useRef<HTMLDialogElement>(null);
   const dragged = useRef(false);
   const drag = useRef<{ y: number; time: number } | null>(null);
@@ -67,13 +70,13 @@ export function Modal({
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
-      aria-label={title}
+      aria-label={t(title)}
     >
       <div className="modal-inner">
         <button
           type="button"
           className="sheet-grabber mobile-only"
-          aria-label={`Dismiss ${title}`}
+          aria-label={t("Dismiss {title}", { title: t(title) })}
           onClick={() => {
             if (!dragged.current) onClose();
             dragged.current = false;
@@ -108,8 +111,8 @@ export function Modal({
           <span />
         </button>
         <div className="modal-header">
-          <h2>{title}</h2>
-          <IconButton label="Close" onClick={onClose}>
+          <h2>{t(title)}</h2>
+          <IconButton label={t("Close")} onClick={onClose}>
             <X size={21} />
           </IconButton>
         </div>
@@ -131,6 +134,7 @@ export function ActionMenu({
   onClose: () => void;
   children: React.ReactNode;
 }) {
+  const { t } = useI18n();
   const mobile = useMobile();
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -155,14 +159,14 @@ export function ActionMenu({
       <button
         type="button"
         className="menu-dismiss"
-        aria-label={`Close ${title.toLowerCase()}`}
+        aria-label={t("Close {title}", { title: t(title) })}
         onClick={onClose}
       />
       <div
         ref={ref}
         className={`popover ${className}`}
         role="dialog"
-        aria-label={title}
+        aria-label={t(title)}
         onKeyDown={(e) => {
           if (e.key === "Escape") {
             e.stopPropagation();

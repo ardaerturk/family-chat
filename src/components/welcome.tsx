@@ -1,4 +1,5 @@
 "use client";
+import { useI18n } from "./language-provider";
 import { useState } from "react";
 import { Fingerprint, ArrowUpRight, LockKeyhole } from "lucide-react";
 import { login, register, passkeyError } from "@/lib/client";
@@ -10,6 +11,7 @@ export default function Welcome({
   invite: string | null;
   onSuccess: () => void;
 }) {
+  const { t } = useI18n();
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   async function unlock() {
@@ -36,12 +38,18 @@ export default function Welcome({
           <Mark size={42} />
         </div>
         <h1>
-          {invite ? "A space just for you." : "Your thoughts.\nYour own space."}
+          {invite
+            ? t("A space just for you.")
+            : t("Your thoughts.\nYour own space.")}
         </h1>
         <p>
           {invite
-            ? "You’ve been invited to ChatGPT. Save a passkey to make this space yours."
-            : "Ask a question. Work through an idea.\nPick up right where you left off."}
+            ? t(
+                "You’ve been invited to ChatGPT. Save a passkey to make this space yours.",
+              )
+            : t(
+                "Ask a question. Work through an idea.\nPick up right where you left off.",
+              )}
         </p>
         <button
           className="primary welcome-cta"
@@ -50,38 +58,38 @@ export default function Welcome({
         >
           {busy ? <Spinner /> : <Fingerprint size={22} />}{" "}
           {busy
-            ? "Waiting for your device…"
+            ? t("Waiting for your device…")
             : invite
-              ? "Accept invitation"
-              : "Unlock with passkey"}
+              ? t("Accept invitation")
+              : t("Unlock with passkey")}
         </button>
         <span className="passkey-hint">
-          Use Face ID, your fingerprint, or device screen lock.
+          {t("Use Face ID, your fingerprint, or device screen lock.")}
         </span>
         {error ? (
           <p className="error-box" role="alert">
-            {error}
+            {t(error)}
           </p>
         ) : null}
         <div className="private-note">
           <LockKeyhole size={14} />
-          <span>Private and invitation only</span>
+          <span>{t("Private and invitation only")}</span>
         </div>
       </section>
       <footer className="welcome-footer">
-        <span>Already invited? Open your personal invitation link.</span>
+        <span>{t("Already invited? Open your personal invitation link.")}</span>
         <details>
           <summary>
-            How to add this to your phone <ArrowUpRight size={13} />
+            {t("How to add this to your phone")}
+            <ArrowUpRight size={13} />
           </summary>
           <p>
-            On iPhone, open in Safari, tap Share, then Add to Home Screen. On
-            Android, open the browser menu and choose Install app.
+            {t(
+              "On iPhone, open in Safari, tap Share, then Add to Home Screen. On Android, open the browser menu and choose Install app.",
+            )}
           </p>
         </details>
-        <small>
-          Your private Azure-powered chat.
-        </small>
+        <small>{t("Your private Azure-powered chat.")}</small>
       </footer>
     </main>
   );

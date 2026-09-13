@@ -1,10 +1,12 @@
 "use client";
+import { useI18n } from "./language-provider";
 import { useEffect, useRef, useState } from "react";
 import { Mic, MicOff, PhoneOff, AudioLines } from "lucide-react";
 import { errorMessage } from "@/lib/client";
 import { Modal, Spinner } from "./ui";
 export default function Voice({ onClose }: { onClose: () => void }) {
-  const [state, setState] = useState("Ready when you are"),
+  const { t } = useI18n();
+  const [state, setState] = useState(t("Ready when you are")),
     [active, setActive] = useState(false),
     [busy, setBusy] = useState(false),
     [muted, setMuted] = useState(false),
@@ -128,18 +130,22 @@ export default function Voice({ onClose }: { onClose: () => void }) {
     }
   }
   return (
-    <Modal title="Voice conversation" onClose={onClose} className="voice-modal">
+    <Modal
+      title={t("Voice conversation")}
+      onClose={onClose}
+      className="voice-modal"
+    >
       <div className="voice-body">
         <div className={`voice-orb ${active ? "active" : ""}`}>
           <AudioLines size={65} strokeWidth={1.25} />
         </div>
-        <h3>{state}</h3>
+        <h3>{t(state)}</h3>
         <p className="voice-transcript" aria-live="polite">
-          {transcript || "A little space to talk things through."}
+          {transcript || t("A little space to talk things through.")}
         </p>
         {error ? (
           <p className="error-box" role="alert">
-            {error}
+            {t(error)}
           </p>
         ) : null}
         <div className="voice-controls">
@@ -147,7 +153,9 @@ export default function Voice({ onClose }: { onClose: () => void }) {
             <>
               <button
                 className={`voice-control ${muted ? "muted-mic" : ""}`}
-                aria-label={muted ? "Unmute microphone" : "Mute microphone"}
+                aria-label={
+                  muted ? t("Unmute microphone") : t("Mute microphone")
+                }
                 onClick={() => {
                   const value = !muted;
                   stream.current
@@ -160,7 +168,7 @@ export default function Voice({ onClose }: { onClose: () => void }) {
               </button>
               <button
                 className="voice-control end-call"
-                aria-label="End voice conversation"
+                aria-label={t("End voice conversation")}
                 onClick={onClose}
               >
                 <PhoneOff />
@@ -169,14 +177,14 @@ export default function Voice({ onClose }: { onClose: () => void }) {
           ) : (
             <button className="primary" onClick={start} disabled={busy}>
               {busy ? <Spinner /> : <Mic size={18} />}{" "}
-              {busy ? "Connecting" : "Start talking"}
+              {busy ? t("Connecting") : t("Start talking")}
             </button>
           )}
         </div>
         <small>
-          Separate from your text chat · not saved
+          {t("Separate from your text chat · not saved")}
           <br />
-          Sessions end after 10 minutes
+          {t("Sessions end after 10 minutes")}
         </small>
       </div>
     </Modal>
