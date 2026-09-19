@@ -8,9 +8,17 @@ import {
   Settings,
   Pin,
   MessageCircle,
+  Folder as FolderIcon,
+  FolderPlus,
+  MoreHorizontal,
+  ChevronDown,
+  ChevronRight,
+  Layers,
 } from "lucide-react";
-import type { ConversationSummary, Person } from "@/lib/types";
-import { IconButton, Mark } from "./ui";
+import type { ConversationSummary, Person, Folder } from "@/lib/types";
+import { api, errorMessage } from "@/lib/client";
+import ChatOrganizer from "./chat-organizer";
+import { IconButton, Mark, Modal } from "./ui";
 import { useMobile } from "@/lib/mobile";
 export default function Sidebar({
   person,
@@ -22,7 +30,15 @@ export default function Sidebar({
   onNew,
   onSelect,
   onSettings,
+  folders,
+  selectedFolder,
+  onFolder,
+  onUpdated,
 }: {
+  folders: Folder[];
+  selectedFolder: string | null;
+  onFolder: (id: string | null) => void;
+  onUpdated: () => Promise<void>;
   person: Person;
   chats: ConversationSummary[];
   active: string | null;
@@ -35,6 +51,42 @@ export default function Sidebar({
 }) {
   const { t, language } = useI18n();
   const [search, setSearch] = useState("");
+  const [organize, setOrganize] = useState<ConversationSummary | null>(null),
+    [folderEdit, setFolderEdit] = useState<Folder | "new" | null>(null),
+    [folderName, setFolderName] = useState(""),
+    [folderBusy, setFolderBusy] = useState(false),
+    [folderError, setFolderError] = useState(""),
+    [deleteFolder, setDeleteFolder] = useState(false),
+    [foldersOpen, setFoldersOpen] = useState(true);
+  function editFolder(folder: Folder | "new") {
+    setFolderName(folder === "new" ? "" : folder.name);
+    setFolderEdit(folder);
+    setFolderError("");
+    setDeleteFolder(false);
+  }
+  async function saveFolder(remove = false) {
+    if (!folderEdit) return;
+    setFolderBusy(true);
+    setFolderError("");
+    try {
+      if (remove && folderEdit !== "new") {
+        await api(`folders/${folderEdit.id}`, "DELETE");
+        if (selectedFolder === folderEdit.id) onFolder(null);
+      } else
+        await api(
+          folderEdit === "new" ? "folders" : `folders/${folderEdit.id}`,
+          folderEdit === "new" ? "POST" : "PATCH",
+          { name: folderName.trim() },
+        );
+      await onUpdated();
+      setFolderEdit(null);
+    } catch (e) {
+      setFolderError(errorMessage(e));
+    } finally {
+      setFolderBusy(false);
+    }
+  }
+
   const [now] = useState(() => Date.now());
   const mobile = useMobile();
   const closeFromKey = useEffectEvent(onClose);
@@ -46,6 +98,7 @@ export default function Sidebar({
     const el = panel.current;
     el?.querySelector<HTMLElement>("button")?.focus({ preventScroll: true });
     function key(e: KeyboardEvent) {
+      if (document.querySelector("dialog[open]")) return;
       if (e.key === "Escape") {
         e.preventDefault();
         closeFromKey();
@@ -72,10 +125,16 @@ export default function Sidebar({
         previous.focus({ preventScroll: true });
     };
   }, [open, mobile]);
-  const filtered = chats.filter((c) =>
-    c.title
-      .toLocaleLowerCase(language)
-      .includes(search.toLocaleLowerCase(language)),
+  const filtered = chats.filter(
+    (c) =>
+      c.title
+        .toLocaleLowerCase(language)
+        .includes(search.toLocaleLowerCase(language)) &&
+      (!!search ||
+        selectedFolder === null ||
+        (selectedFolder === "unfiled"
+          ? !c.folderId
+          : c.folderId === selectedFolder)),
   );
   let previous = "";
   return (
@@ -148,6 +207,69 @@ export default function Sidebar({
           <kbd>⌘ K</kbd>
         </label>
         <nav className="chat-history">
+          <div className="folder-navigation">
+            <button
+              className={`folder-row ${selectedFolder === null ? "selected" : ""}`}
+              onClick={() => onFolder(null)}
+            >
+              <Layers size={17} />
+              <span>{t("All conversations")}</span>
+              <small>{chats.length}</small>
+            </button>
+            <button
+              className={`folder-row ${selectedFolder === "unfiled" ? "selected" : ""}`}
+              onClick={() => onFolder("unfiled")}
+            >
+              <MessageCircle size={17} />
+              <span>{t("Unfiled")}</span>
+              <small>{chats.filter((c) => !c.folderId).length}</small>
+            </button>
+            <div className="folder-heading">
+              <button
+                onClick={() => setFoldersOpen(!foldersOpen)}
+                aria-expanded={foldersOpen}
+              >
+                {foldersOpen ? (
+                  <ChevronDown size={14} />
+                ) : (
+                  <ChevronRight size={14} />
+                )}{" "}
+                {t("Folders")}
+              </button>
+              <IconButton
+                label={t("New folder")}
+                disabled={busy}
+                onClick={() => editFolder("new")}
+              >
+                <FolderPlus size={17} />
+              </IconButton>
+            </div>
+            {foldersOpen
+              ? folders.map((f) => (
+                  <div className="history-row" key={f.id}>
+                    <button
+                      className={`folder-row ${selectedFolder === f.id ? "selected" : ""}`}
+                      onClick={() => onFolder(f.id)}
+                    >
+                      <FolderIcon size={17} />
+                      <span>{f.name}</span>
+                      <small>
+                        {chats.filter((c) => c.folderId === f.id).length}
+                      </small>
+                    </button>
+                    <IconButton
+                      className="history-options"
+                      label={t("Folder options: {name}", { name: f.name })}
+                      disabled={busy}
+                      onClick={() => editFolder(f)}
+                    >
+                      <MoreHorizontal size={18} />
+                    </IconButton>
+                  </div>
+                ))
+              : null}
+          </div>
+
           {filtered.length ? (
             filtered.map((c) => {
               const day = new Date(c.updatedAt).toDateString();
@@ -163,14 +285,26 @@ export default function Sidebar({
               return (
                 <div key={c.id}>
                   {heading ? <h3>{group}</h3> : null}
-                  <button
-                    className={`history-item ${active === c.id ? "selected" : ""}`}
-                    disabled={busy}
-                    onClick={() => onSelect(c.id)}
-                  >
-                    <span>{c.title}</span>
-                    {c.pinned ? <Pin size={13} /> : null}
-                  </button>
+                  <div className="history-row">
+                    <button
+                      className={`history-item ${active === c.id ? "selected" : ""}`}
+                      disabled={busy}
+                      onClick={() => onSelect(c.id)}
+                    >
+                      <span>{c.title}</span>
+                      {c.pinned ? <Pin size={13} /> : null}
+                    </button>
+                    <IconButton
+                      className="history-options"
+                      label={t("Conversation options: {name}", {
+                        name: c.title,
+                      })}
+                      disabled={busy}
+                      onClick={() => setOrganize(c)}
+                    >
+                      <MoreHorizontal size={18} />
+                    </IconButton>
+                  </div>
                 </div>
               );
             })
@@ -200,6 +334,85 @@ export default function Sidebar({
           <Settings size={18} />
         </button>
       </aside>
+      {organize ? (
+        <ChatOrganizer
+          chat={organize}
+          folders={folders}
+          onChanged={onUpdated}
+          onClose={() => setOrganize(null)}
+        />
+      ) : null}
+      {folderEdit ? (
+        <Modal
+          title={t(folderEdit === "new" ? "New folder" : "Edit folder")}
+          onClose={() => setFolderEdit(null)}
+          className="organizer-modal"
+        >
+          <form
+            className="organizer-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void saveFolder();
+            }}
+          >
+            <label>
+              {t("Folder name")}
+              <input
+                value={folderName}
+                maxLength={60}
+                required
+                disabled={folderBusy}
+                onChange={(e) => setFolderName(e.target.value)}
+              />
+            </label>
+            {folderError ? (
+              <p className="error-box" role="alert">
+                {t(folderError)}
+              </p>
+            ) : null}
+            {deleteFolder ? (
+              <div className="confirmation">
+                <p>
+                  {t(
+                    "Delete this folder? Your conversations will be kept in Unfiled.",
+                  )}
+                </p>
+                <button
+                  type="button"
+                  className="secondary danger"
+                  disabled={folderBusy}
+                  onClick={() => saveFolder(true)}
+                >
+                  {t("Delete folder")}
+                </button>
+              </div>
+            ) : folderEdit !== "new" ? (
+              <button
+                type="button"
+                className="secondary danger"
+                onClick={() => setDeleteFolder(true)}
+              >
+                {t("Delete folder")}
+              </button>
+            ) : null}
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => setFolderEdit(null)}
+              >
+                {t("Cancel")}
+              </button>
+              <button
+                className="primary"
+                disabled={folderBusy || !folderName.trim()}
+              >
+                {t(folderBusy ? "Saving…" : "Save")}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      ) : null}
     </>
   );
 }

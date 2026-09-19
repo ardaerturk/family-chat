@@ -11,7 +11,9 @@ This is an independent application, not an official ChatGPT client. It does not 
 - Mobile action sheets for models, attachments, and chat options; swipe-down keyboard dismissal, dismissible sheet handles, 44 px controls, and conversation scrolling that preserves your reading position.
 - Owner-issued, single-use invitations. No public signup and no shared password.
 - Discoverable passkeys with required device verification, backed by SimpleWebAuthn.
-- Separate histories for each account, with search, rename, pin, delete, export, edit, regenerate, and stop.
+- Separate histories for each account, with search, rename, pin, delete, export, edit, regenerate, and stop. History-row menus organize conversations without opening them.
+- Create and rename folders, move conversations, and filter by folder or Unfiled. Deleting a folder keeps its conversations. Up to 50 folders per account.
+- Opt-in memory with separate recall/generation controls, source evidence, and manual add/edit/delete in Settings → Memory. `/memories` opens controls; temporary chats never use or generate memories. See [memory design](docs/memory-design.md) for Codex references, eligibility, limits, and deliberate differences.
 - Allowlisted Azure deployments and configurable thinking effort.
 - Built-in Responses API web search: automatic when useful, or explicitly selected from the attachment menu. Live search activity, clickable inline citations, and saved source lists. Your Azure deployments must support the `web_search` tool.
 - English and Turkish interface, selected in Settings and saved to the account across devices. The preferred language also guides text and voice replies.
@@ -65,7 +67,7 @@ This requires server secrets and is deliberately unavailable as a public HTTP ac
 
 Create a Vercel project and configure the server variables as sensitive production environment variables. Deploy with the authenticated Vercel CLI. No GitHub integration is required. If your deployment address is private, do not enable public deployment checks, badges, repository homepage links, screenshots with the address, or GitHub deployment records.
 
-The repository’s daily Vercel cron calls `/api/maintenance`, protected by `CRON_SECRET`. It removes expired sessions, challenges, invitations, expired counters, and orphan uploads older than 24 hours. Set the function duration to at least 240 seconds (configured in the route). Verify streaming and WebRTC behavior on the actual hosting plan and network.
+The repository’s daily Vercel cron calls `/api/maintenance`, protected by `CRON_SECRET`. It removes expired sessions, challenges, invitations, expired counters, and orphan uploads older than 24 hours, then runs bounded memory work. Authenticated app loads also schedule eligible memory work. Set the function duration to at least 240 seconds (configured in the route). Verify streaming and WebRTC behavior on the actual hosting plan and network.
 
 ## Data and security design
 
@@ -82,7 +84,7 @@ The repository’s daily Vercel cron calls `/api/maintenance`, protected by `CRO
 
 - Voice sessions are separate from text chats and are not saved. The app ends voice after ten minutes; this is a client timer, not a provider billing ceiling. A signed-in user can modify their client. Use Azure quotas and billing alerts for a hard operational spending boundary.
 - Revocation prevents new requests; it cannot retract data already viewed or immediately terminate an established peer-to-peer voice connection.
-- There is no code execution sandbox, image generation, or long-term model memory. This app uses Azure Responses with built-in web search, not the managed Codex harness. The OpenAI Agents API is a separate integration with its own authentication and environment requirements; identical ChatGPT/Codex capabilities or latency are not promised. Word/Excel/PowerPoint attachments are not accepted; export them to PDF or CSV/text first.
+- There is no code execution sandbox or image generation. Account memory is implemented using the documented Codex pattern, with different storage, scheduling, retrieval, and budgets. This app uses Azure Responses with built-in web search, not the managed Codex harness. The OpenAI Agents API is a separate integration with its own authentication and environment requirements; identical ChatGPT/Codex capabilities or latency are not promised. Word/Excel/PowerPoint attachments are not accepted; export them to PDF or CSV/text first.
 - PDF/image support depends on the configured Azure model. Azure service retention, abuse monitoring, and regional processing remain subject to your Azure configuration; `store:false` does not imply zero provider retention.
 - This remains a web app, not a UIKit application. The operating system controls keyboard animation, dictation, selection, and native pickers. Home Screen mode removes browser chrome; a physical device check is needed to assess those platform interactions.
 - The app needs connectivity for chat. It is not an offline inference client. Device passkeys, microphone permissions, audio autoplay, and Home Screen installation need a real-device check on your target iOS/Android version.

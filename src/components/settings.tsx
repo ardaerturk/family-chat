@@ -23,6 +23,7 @@ import {
   ApiError,
 } from "@/lib/client";
 import type { Person, SessionView } from "@/lib/types";
+import MemoryPanel from "./memory-panel";
 import { Modal, Spinner } from "./ui";
 type PeopleData = {
   people: Person[];
@@ -35,7 +36,11 @@ export default function Settings({
   onClose,
   onLogout,
   onCleared,
+  onOpenChat,
+  initialTab = "general",
 }: {
+  initialTab?: string;
+  onOpenChat: (id: string) => void;
   person: Person;
   theme: string;
   setTheme: (s: string) => void;
@@ -45,7 +50,7 @@ export default function Settings({
 }) {
   const { t, language, setLanguage } = useI18n();
   const [savingLanguage, setSavingLanguage] = useState(false);
-  const [tab, setTab] = useState("general"),
+  const [tab, setTab] = useState(initialTab),
     [sessions, setSessions] = useState<SessionView[]>([]),
     [people, setPeople] = useState<PeopleData>({ people: [], invitations: [] }),
     [name, setName] = useState(""),
@@ -106,6 +111,7 @@ export default function Settings({
       <div className="settings-tabs" role="tablist">
         {[
           ["general", t("General")],
+          ["memory", t("Memory")],
           ["security", t("Security")],
           ...(person.role === "owner" ? [["family", t("Family")]] : []),
         ].map(([id, label]) => (
@@ -124,6 +130,7 @@ export default function Settings({
         ))}
       </div>
       <div className="settings-content">
+        {tab === "memory" ? <MemoryPanel onOpenChat={onOpenChat} /> : null}
         {error ? (
           <div className="error-box" role="alert">
             {t(error)}

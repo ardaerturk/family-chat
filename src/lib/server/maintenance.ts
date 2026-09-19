@@ -4,6 +4,7 @@ import { NextRequest } from "next/server";
 import { env } from "./config";
 import { fail, json } from "./http";
 import * as db from "./store";
+import { memoryBackground } from "./memory";
 import { deleteFile, type FileRecord } from "./files";
 import type { Person, Conversation } from "../types";
 export async function maintenance(req: NextRequest) {
@@ -47,5 +48,15 @@ export async function maintenance(req: NextRequest) {
       }
     }
   }
+  // Bound inference work so cleanup still fits the function duration. App visits also trigger passes.
+  const memoryUsers = (await db.list<Person>("auth", "user_")).filter(
+    (r) => !r.value.disabled,
+  );
+  const start =
+    (Math.floor(Date.now() / 86400000) * 2) % Math.max(memoryUsers.length, 1);
+  for (let n = 0; n < Math.min(2, memoryUsers.length); n++)
+    await memoryBackground(
+      memoryUsers[(start + n) % memoryUsers.length].value.id,
+    );
   return json({ ok: true, removed });
 }

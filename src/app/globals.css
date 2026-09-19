@@ -2230,3 +2230,34 @@ button {
     font-size: 15px;
   }
 }
+
+/* Conversation organization shares the app's quiet, touch-friendly list layout. */
+.history-row {display:flex;align-items:center;position:relative;min-width:0;border-radius:8px}
+.history-row .history-item,.history-row .folder-row {flex:1;min-width:0;width:auto}
+.history-options {flex:0 0 36px;width:36px;height:36px;opacity:0}
+.history-row:hover .history-options,.history-row:focus-within .history-options {opacity:1}
+.folder-navigation {padding:2px 0 12px;border-bottom:1px solid var(--line);margin-bottom:8px}
+.folder-row {display:flex;align-items:center;gap:10px;width:100%;padding:10px 9px;border:0;background:none;text-align:left;border-radius:8px;color:inherit;min-width:0}
+.folder-row span {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.folder-row small {font-size:11px;color:var(--muted)}
+.folder-row.selected,.folder-row:hover {background:var(--hover)}
+.folder-heading {display:flex;align-items:center;justify-content:space-between;margin:10px 0 3px;color:var(--muted)}
+.folder-heading>button:first-child {display:flex;align-items:center;gap:4px;background:none;border:0;color:inherit;font-size:12px;padding:8px}
+.folder-context {text-align:center;font-size:12px;color:var(--muted);padding:8px 12px}
+.organizer-modal {max-width:440px}
+.organizer-form {display:grid;gap:20px;padding:22px}
+.organizer-form>label,.memory-editor label {display:grid;gap:8px;font-size:14px;font-weight:500}
+.organizer-form input:not([type=checkbox]),.organizer-form select,.memory-editor textarea {width:100%;min-height:44px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--bg);color:var(--text);font:inherit}
+.memory-controls {display:grid;gap:16px;border:0;padding:0;margin:8px 0}
+.memory-controls legend {font-size:13px;font-weight:600;margin-bottom:14px}
+.memory-controls label {display:flex;align-items:center;gap:12px;min-height:32px;font-size:14px;cursor:pointer}
+.memory-controls input {width:18px;height:18px;accent-color:var(--text);flex-shrink:0}
+.memory-controls p,.memory-explanation,.memory-editor p {color:var(--muted);font-size:12px;line-height:1.6;margin:0}
+.memory-intro {display:flex;align-items:flex-start;gap:12px;margin:4px 0 26px}
+.memory-intro>div {flex:1}.memory-intro h3 {font-size:17px;margin:0 0 6px}.memory-intro p {font-size:13px;color:var(--muted);line-height:1.6;margin:0}
+.memory-explanation {margin:18px 0}
+.memory-list-heading {display:flex;align-items:center;justify-content:space-between;gap:8px;margin:28px 0 12px}.memory-list-heading h3 {font-size:14px}.memory-list-heading h3 span {font-size:11px;font-weight:400;color:var(--muted);margin-left:5px}
+.memory-list {list-style:none;padding:0;margin:0 0 24px}.memory-list>li {padding:16px 0;border-bottom:1px solid var(--line);position:relative}.memory-list p {margin:0 0 10px;font-size:14px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}.memory-list small,.memory-list details {font-size:12px;color:var(--muted)}.memory-list blockquote {margin:10px 0;padding-left:12px;border-left:2px solid var(--line);white-space:pre-wrap}.memory-entry-actions {display:flex;justify-content:flex-end}.memory-empty {color:var(--muted);font-size:13px;line-height:1.6;padding:12px 0}.memory-editor {border:1px solid var(--line);border-radius:12px;padding:16px;display:grid;gap:12px;margin:12px 0}.memory-editor textarea {resize:vertical}.text-button {border:0;background:none;color:inherit;text-decoration:underline;padding:8px 0;text-align:left}
+@media (hover:none),(max-width:767px){.history-options {opacity:1;flex-basis:44px;width:44px;height:44px}.folder-row {min-height:44px}.organizer-form input:not([type=checkbox]),.organizer-form select,.memory-editor textarea {font-size:16px}.memory-controls label {min-height:44px}.settings-tabs {overflow-x:auto;flex-shrink:0}.memory-list-heading {flex-wrap:wrap}}
+.organizer-form .modal-actions,.memory-editor .modal-actions {display:flex;justify-content:flex-end;gap:8px}
+.organizer-form {overflow-y:auto;overscroll-behavior:contain}

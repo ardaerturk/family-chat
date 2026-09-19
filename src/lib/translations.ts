@@ -1,5 +1,59 @@
 export type Language = "en" | "tr";
 export const turkish: Record<string, string> = {
+  "Organize conversation": "Sohbeti düzenle",
+  Folder: "Klasör",
+  Unfiled: "Klasörsüz",
+  "Memory for this conversation": "Bu sohbetin belleği",
+  "Use saved memories": "Kayıtlı anıları kullan",
+  "Learn from this conversation": "Bu sohbetten öğren",
+  "These choices apply when memory is enabled in Settings.":
+    "Bu seçimler Ayarlar’da bellek açıkken geçerlidir.",
+  "All conversations": "Tüm sohbetler",
+  Folders: "Klasörler",
+  "New folder": "Yeni klasör",
+  "Edit folder": "Klasörü düzenle",
+  "Folder name": "Klasör adı",
+  "Folder options: {name}": "Klasör seçenekleri: {name}",
+  "Conversation options: {name}": "Sohbet seçenekleri: {name}",
+  "Delete this folder? Your conversations will be kept in Unfiled.":
+    "Bu klasör silinsin mi? Sohbetleriniz Klasörsüz bölümünde kalacak.",
+  "Delete folder": "Klasörü sil",
+  Memory: "Bellek",
+  "Useful context that carries into your next conversation. Private to your account.":
+    "Sonraki sohbetinizde hatırlanacak yararlı bilgiler. Yalnızca hesabınıza özeldir.",
+  "Refresh memories": "Belleği yenile",
+  "Enable memory": "Belleği aç",
+  "Learn from new conversations": "Yeni sohbetlerden öğren",
+  "Exclude conversations that use web search":
+    "Web araması kullanan sohbetleri hariç tut",
+  "Automatic memory updates run in the background after a conversation has been idle for at least six hours. Temporary chats never use or create memories.":
+    "Bir sohbet en az altı saat kullanılmadığında bellek arka planda güncellenir. Geçici sohbetler belleği kullanmaz ve belleğe bilgi eklemez.",
+  "Saved memories": "Kayıtlı anılar",
+  "Add memory": "Anı ekle",
+  "What should be remembered?": "Ne hatırlansın?",
+  "Do not add passwords, keys, or other secrets.":
+    "Parola, anahtar veya başka gizli bilgiler eklemeyin.",
+  "Save memory": "Anıyı kaydet",
+  Source: "Kaynak",
+  "View source conversation": "Kaynak sohbeti aç",
+  "Saved by you": "Sizin tarafınızdan kaydedildi",
+  "Edit memory": "Anıyı düzenle",
+  "Delete memory": "Anıyı sil",
+  "No saved memories yet. Add one now, or let eligible conversations build them over time.":
+    "Henüz kayıtlı anı yok. Şimdi bir anı ekleyebilir veya uygun sohbetlerden zamanla öğrenilmesini bekleyebilirsiniz.",
+  "Delete all memories? Previous conversations will not be used to rebuild them.":
+    "Tüm anılar silinsin mi? Önceki sohbetler bunları yeniden oluşturmak için kullanılmayacak.",
+  "Delete all memories": "Tüm anıları sil",
+  "Turning memory off keeps saved entries. Editing or deleting an automatic entry stops that source conversation from generating it again.":
+    "Belleği kapatmak kayıtlı anıları silmez. Otomatik bir anıyı düzenlemek veya silmek, kaynak sohbetin onu yeniden oluşturmasını durdurur.",
+  "You can create up to 50 folders.": "En fazla 50 klasör oluşturabilirsiniz.",
+  "Folder not found.": "Klasör bulunamadı.",
+  "Memory not found.": "Anı bulunamadı.",
+  "Do not save passwords, keys, or secrets in memory.":
+    "Belleğe parola, anahtar veya gizli bilgi kaydetmeyin.",
+  "Memory is full. Remove an entry before adding another.":
+    "Bellek dolu. Yeni bir anı eklemeden önce birini silin.",
+
   "A little off the record.": "Biraz da kayıt dışı konuşalım.",
   "A little space to talk things through.": "Konuşmak için buradayım.",
   "A space just for you.": "Size özel bir alan.",

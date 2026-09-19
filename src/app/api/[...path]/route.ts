@@ -1,4 +1,11 @@
-import { NextRequest } from "next/server";
+import { NextRequest, after } from "next/server";
+import { randomUUID } from "node:crypto";
+import {
+  memoryBackground,
+  memoryState,
+  writeMemory,
+} from "@/lib/server/memory";
+import { memorySettings, redactMemorySecrets } from "@/lib/memory-policy";
 import { z } from "zod";
 import * as auth from "@/lib/server/auth";
 import * as db from "@/lib/server/store";
@@ -19,7 +26,12 @@ import {
 } from "@/lib/server/files";
 import { voice } from "@/lib/server/voice";
 import { maintenance } from "@/lib/server/maintenance";
-import type { ConversationSummary, Person, Preferences } from "@/lib/types";
+import type {
+  ConversationSummary,
+  Person,
+  Preferences,
+  Folder,
+} from "@/lib/types";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 240;
@@ -49,6 +61,7 @@ async function handle(req: NextRequest, context: Context) {
     const user = current.person;
     if (method === "GET" && path === "me") {
       const preferences = await db.get<Preferences>(user.id, "preferences");
+      after(() => memoryBackground(user.id));
       return json({
         person: user,
         models: models(),
@@ -57,12 +70,169 @@ async function handle(req: NextRequest, context: Context) {
       });
     }
     if (method === "PATCH" && path === "preferences") {
-      const preferences = await body(
+      const change = await body(
         req,
-        z.object({ language: z.enum(["en", "tr"]) }).strict(),
+        z
+          .object({
+            language: z.enum(["en", "tr"]).optional(),
+            memory: z
+              .object({
+                enabled: z.boolean().optional(),
+                use: z.boolean().optional(),
+                generate: z.boolean().optional(),
+                excludeSearch: z.boolean().optional(),
+              })
+              .strict()
+              .optional(),
+          })
+          .strict(),
       );
-      await db.put(user.id, "preferences", preferences);
-      return json(preferences);
+      const unlock = await userLock(user.id);
+      try {
+        const previous = (await db.get<Preferences>(user.id, "preferences"))
+          ?.value ?? { language: "en" as const };
+        const preferences = {
+          ...previous,
+          ...change,
+          ...(change.memory
+            ? {
+                memory: {
+                  ...memorySettings(previous.memory),
+                  ...change.memory,
+                },
+              }
+            : {}),
+        };
+        if (change.memory)
+          await writeMemory(user.id, await memoryState(user.id));
+        await db.put(user.id, "preferences", preferences);
+        return json(preferences);
+      } finally {
+        await unlock();
+      }
+    }
+    if (path === "folders" && method === "GET")
+      return json(
+        (await db.list<Folder>(user.id, "folder_"))
+          .map((r) => r.value)
+          .sort((a, b) => a.name.localeCompare(b.name)),
+      );
+    if (parts[0] === "folders" && (parts.length === 1 || parts.length === 2)) {
+      const id = parts.length === 2 ? uuid.parse(parts[1]) : randomUUID();
+      const unlock = await userLock(user.id);
+      try {
+        if (method === "POST" && parts.length === 1) {
+          const { name } = await body(
+            req,
+            z.object({ name: z.string().trim().min(1).max(60) }).strict(),
+          );
+          if ((await db.list(user.id, "folder_")).length >= 50)
+            fail(400, "You can create up to 50 folders.");
+          const folder = { id, name, createdAt: new Date().toISOString() };
+          await db.create(user.id, `folder_${id}`, folder);
+          return json(folder);
+        }
+        const folder = await db.get<Folder>(user.id, `folder_${id}`);
+        if (!folder) fail(404, "Folder not found.");
+        if (method === "PATCH") {
+          const { name } = await body(
+            req,
+            z.object({ name: z.string().trim().min(1).max(60) }).strict(),
+          );
+          await db.put(user.id, `folder_${id}`, { ...folder.value, name });
+          return json({ ok: true });
+        }
+        if (method === "DELETE") {
+          for (const row of await db.list<ConversationSummary>(
+            user.id,
+            "chat_",
+          ))
+            if (row.value.folderId === id) {
+              const c = await conversation(user.id, row.value.id);
+              c.folderId = null;
+              await save(user.id, c);
+            }
+          await db.remove(user.id, `folder_${id}`);
+          return json({ ok: true });
+        }
+      } finally {
+        await unlock();
+      }
+    }
+    if (path === "memories" && method === "GET")
+      return json({
+        state: await memoryState(user.id),
+        settings: memorySettings(
+          (await db.get<Preferences>(user.id, "preferences"))?.value.memory,
+        ),
+      });
+    if (parts[0] === "memories" && parts.length <= 2 && method !== "GET") {
+      const id = parts.length === 2 ? uuid.parse(parts[1]) : undefined;
+      const input =
+        method === "POST" || method === "PATCH"
+          ? await body(
+              req,
+              z.object({ text: z.string().trim().min(1).max(500) }).strict(),
+            )
+          : undefined;
+      if (input && redactMemorySecrets(input.text) !== input.text)
+        fail(400, "Do not save passwords, keys, or secrets in memory.");
+      const unlock = await userLock(user.id);
+      try {
+        const state = await memoryState(user.id);
+        const existing = id
+          ? state.entries.find((m) => m.id === id)
+          : undefined;
+        if (id && !existing) fail(404, "Memory not found.");
+        if (method === "DELETE" && !id) {
+          state.entries = [];
+          state.blockedSources = [];
+          state.cutoff = Date.now();
+          for (const row of await db.list(user.id, "memory_source_"))
+            await db.remove(user.id, row.id);
+        } else if (
+          method === "DELETE" ||
+          method === "PATCH" ||
+          (method === "POST" && !id)
+        ) {
+          if (existing?.sourceChatId) {
+            state.blockedSources = [
+              ...new Set([...state.blockedSources, existing.sourceChatId]),
+            ];
+            await db.remove(user.id, `memory_source_${existing.sourceChatId}`);
+            const sourceBytes = await db.blobGet(
+              `chats/${user.id}/${existing.sourceChatId}`,
+            );
+            if (sourceBytes) {
+              const source = JSON.parse(sourceBytes.toString());
+              source.generateMemory = false;
+              await save(user.id, source);
+            }
+          }
+          if (method === "DELETE")
+            state.entries = state.entries.filter((m) => m.id !== id);
+          else {
+            const text = input!.text;
+            if (!id && state.entries.length >= 30)
+              fail(
+                400,
+                "Memory is full. Remove an entry before adding another.",
+              );
+            const memory = {
+              id: id ?? randomUUID(),
+              text,
+              updatedAt: new Date().toISOString(),
+            };
+            state.entries = id
+              ? state.entries.map((m) => (m.id === id ? memory : m))
+              : [...state.entries, memory];
+          }
+        } else fail(405, "Method not allowed.");
+        await writeMemory(user.id, state);
+        return json({ ok: true });
+      } finally {
+        await unlock();
+      }
     }
     if (method === "GET" && path === "chats") {
       const rows = await db.list<ConversationSummary>(user.id, "chat_");
@@ -91,9 +261,19 @@ async function handle(req: NextRequest, context: Context) {
             z.object({
               title: z.string().trim().min(1).max(100).optional(),
               pinned: z.boolean().optional(),
+              folderId: uuid.nullable().optional(),
+              useMemory: z.boolean().optional(),
+              generateMemory: z.boolean().optional(),
             }),
           );
           const c = await conversation(user.id, id);
+          if (
+            change.folderId &&
+            !(await db.get(user.id, `folder_${change.folderId}`))
+          )
+            fail(404, "Folder not found.");
+          if (change.generateMemory && !c.generateMemory)
+            c.memoryEligibleAt = new Date().toISOString();
           Object.assign(c, change);
           await save(user.id, c);
           return json({ ok: true });
@@ -157,6 +337,10 @@ async function handle(req: NextRequest, context: Context) {
       return json({
         exportedAt: new Date().toISOString(),
         conversations: chats,
+        folders: (await db.list<Folder>(user.id, "folder_")).map(
+          (r) => r.value,
+        ),
+        memories: (await memoryState(user.id)).entries,
       });
     }
     if (path === "chats" && method === "DELETE") {

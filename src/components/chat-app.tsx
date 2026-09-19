@@ -25,6 +25,7 @@ import type {
   ConversationSummary,
   Message,
   Model,
+  Folder,
   Person,
 } from "@/lib/types";
 import { api, ApiError, errorMessage } from "@/lib/client";
@@ -34,6 +35,7 @@ import Composer from "./composer";
 import Messages from "./messages";
 import { ActionMenu, IconButton, Mark, Modal, Spinner } from "./ui";
 import { dismissKeyboard, useMobile, useMobileViewport } from "@/lib/mobile";
+const ChatOrganizer = dynamic(() => import("./chat-organizer"));
 const Settings = dynamic(() => import("./settings"));
 const Voice = dynamic(() => import("./voice"));
 type Identity = {
@@ -100,6 +102,10 @@ function ChatApp() {
     [rename, setRename] = useState<string | null>(null),
     [confirmDelete, setConfirmDelete] = useState(false),
     [offline, setOffline] = useState(false);
+  const [folders, setFolders] = useState<Folder[]>([]),
+    [selectedFolder, setSelectedFolder] = useState<string | null>(null),
+    [organize, setOrganize] = useState(false);
+  const [settingsTab, setSettingsTab] = useState("general");
   const uploadLock = useRef(false);
   const dragDepth = useRef(0);
   const abort = useRef<AbortController | null>(null);
@@ -129,7 +135,12 @@ function ChatApp() {
     };
   }, []);
   async function refreshChats() {
-    setChats(await api<ConversationSummary[]>("chats"));
+    const [nextChats, nextFolders] = await Promise.all([
+      api<ConversationSummary[]>("chats"),
+      api<Folder[]>("folders"),
+    ]);
+    setChats(nextChats);
+    setFolders(nextFolders);
   }
   async function boot() {
     setBootError("");
@@ -306,6 +317,15 @@ function ChatApp() {
   }
   async function send(retry = false) {
     if (busy || uploading || !identity) return;
+    if (!retry && text.trim() === "/memories") {
+      setText("");
+      if (active) setOrganize(true);
+      else {
+        setSettingsTab("memory");
+        setSettings(true);
+      }
+      return;
+    }
     const prompt = retry
       ? ([...messages].reverse().find((m) => m.role === "user")?.content ??
         "Continue")
@@ -361,6 +381,10 @@ function ChatApp() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           conversationId: active ?? undefined,
+          folderId:
+            !active && selectedFolder && selectedFolder !== "unfiled"
+              ? selectedFolder
+              : undefined,
           message: prompt,
           files: files.map((f) => f.id),
           model,
@@ -541,6 +565,10 @@ function ChatApp() {
   return (
     <div className="app-shell">
       <Sidebar
+        folders={folders}
+        selectedFolder={selectedFolder}
+        onFolder={setSelectedFolder}
+        onUpdated={refreshChats}
         person={identity.person}
         chats={chats}
         active={active}
@@ -711,6 +739,14 @@ function ChatApp() {
                     <>
                       <button
                         onClick={() => {
+                          setOrganize(true);
+                          setMoreMenu(false);
+                        }}
+                      >
+                        {t("Organize conversation")}
+                      </button>
+                      <button
+                        onClick={() => {
                           setRename(current?.title ?? "");
                           setMoreMenu(false);
                         }}
@@ -771,6 +807,11 @@ function ChatApp() {
         {offline ? (
           <div className="offline-banner" role="status">
             {t("You’re offline. Reconnect to send a message.")}
+          </div>
+        ) : null}
+        {!messages.length && selectedFolder && selectedFolder !== "unfiled" ? (
+          <div className="folder-context">
+            {t("Folder")}: {folders.find((f) => f.id === selectedFolder)?.name}
           </div>
         ) : null}
         {!messages.length ? (
@@ -865,12 +906,28 @@ function ChatApp() {
           }}
         />
       </main>
+      {organize && current ? (
+        <ChatOrganizer
+          chat={current}
+          folders={folders}
+          onChanged={refreshChats}
+          onClose={() => setOrganize(false)}
+        />
+      ) : null}
       {settings ? (
         <Settings
+          initialTab={settingsTab}
+          onOpenChat={(id) => {
+            setSettings(false);
+            void select(id);
+          }}
           person={identity.person}
           theme={theme}
           setTheme={setTheme}
-          onClose={() => setSettings(false)}
+          onClose={() => {
+            setSettings(false);
+            setSettingsTab("general");
+          }}
           onLogout={logout}
           onCleared={() => {
             newChat();

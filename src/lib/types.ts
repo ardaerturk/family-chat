@@ -18,7 +18,31 @@ export type Attachment = {
   size: number;
 };
 export type Source = { url: string; title: string };
-export type Preferences = { language: "en" | "tr" };
+export type MemorySettings = {
+  enabled: boolean;
+  use: boolean;
+  generate: boolean;
+  excludeSearch: boolean;
+};
+export type Preferences = { language: "en" | "tr"; memory?: MemorySettings };
+export type Folder = { id: string; name: string; createdAt: string };
+export type MemoryEntry = {
+  id: string;
+  text: string;
+  updatedAt: string;
+  sourceChatId?: string;
+  sourceMessageId?: string;
+  quote?: string;
+};
+export type MemoryState = {
+  revision: number;
+  cutoff: number;
+  summary: string;
+  entries: MemoryEntry[];
+  blockedSources: string[];
+  updatedAt?: string;
+};
+
 export type Message = {
   id: string;
   role: "user" | "assistant";
@@ -38,6 +62,10 @@ export type Conversation = {
   updatedAt: string;
   pinned?: boolean;
   temporary?: boolean;
+  folderId?: string | null;
+  useMemory?: boolean;
+  generateMemory?: boolean;
+  memoryEligibleAt?: string;
 };
 export type ConversationSummary = Omit<Conversation, "messages">;
 export type SessionView = {
