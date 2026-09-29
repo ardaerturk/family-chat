@@ -227,6 +227,7 @@ function ChatApp() {
     dismissKeyboard();
     files.forEach((f) => api(`files/${f.id}`, "DELETE").catch(() => {}));
     setActive(null);
+    setModel(identity?.models[0]?.id ?? "");
     setMessages([]);
     setText("");
     setFiles([]);

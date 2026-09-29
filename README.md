@@ -14,7 +14,7 @@ This is an independent application, not an official ChatGPT client. It does not 
 - Separate histories for each account, with search, rename, pin, delete, export, edit, regenerate, and stop. History-row menus organize conversations without opening them.
 - Create and rename folders, move conversations, and filter by folder or Unfiled. Deleting a folder keeps its conversations. Up to 50 folders per account.
 - Opt-in memory with separate recall/generation controls, source evidence, and manual add/edit/delete in Settings → Memory. `/memories` opens controls; temporary chats never use or generate memories. See [memory design](docs/memory-design.md) for Codex references, eligibility, limits, and deliberate differences.
-- Allowlisted Azure deployments and configurable thinking effort.
+- GPT-6 Sol as the default Azure deployment, other allowlisted Azure deployments, and configurable thinking effort.
 - Built-in Responses API web search: automatic when useful, or explicitly selected from the attachment menu. Live search activity, clickable inline citations, and saved source lists. Your Azure deployments must support the `web_search` tool.
 - English and Turkish interface, selected in Settings and saved to the account across devices. The preferred language also guides text and voice replies.
 - Paste clipboard images into the composer, use **Paste image** from the attachment menu, or drop photos/files onto the chat on desktop. Pending images show private thumbnails; large images are resized before upload. Clipboard access depends on browser support and permission.
@@ -37,7 +37,7 @@ npm run dev
 
 `APP_ORIGIN` must exactly match the browser origin, with no trailing slash. Passkeys bind to the hostname: credentials registered on localhost will not work on another hostname. Production requires HTTPS. Settle your permanent hostname before enrolling people.
 
-The model list uses **Azure deployment names**, not an assumed catalog of available models. Verify that each selected deployment supports the Responses API and any modalities you expose. Realtime voice requires its own compatible Azure deployment.
+GPT-6 Sol uses the Azure deployment named `gpt-6-sol` and appears first, so it is the default when opening a new chat. `AZURE_CHAT_MODELS` adds the other available deployments; any duplicate `gpt-6-sol` entry is ignored. The model list uses **Azure deployment names**, not an assumed catalog of available models. Verify that each selected deployment supports the Responses API and any modalities you expose. Realtime voice requires its own compatible Azure deployment.
 
 ### First owner
 

@@ -22,7 +22,16 @@ export function origin() {
   return url.origin;
 }
 export function models() {
-  return modelsSchema.parse(JSON.parse(env("AZURE_CHAT_MODELS")));
+  const configured = modelsSchema.parse(JSON.parse(env("AZURE_CHAT_MODELS")));
+  return [
+    {
+      id: "gpt-6-sol",
+      label: "GPT-6 Sol",
+      description: "Azure OpenAI · complex tasks",
+      reasoning: true,
+    },
+    ...configured.filter((model) => model.id !== "gpt-6-sol"),
+  ];
 }
 export function endpoint(name = "AZURE_OPENAI_ENDPOINT") {
   const url = new URL(env(name));
