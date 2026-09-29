@@ -247,7 +247,11 @@ function ChatApp() {
       const c = await api<Conversation>(`chats/${id}`);
       setActive(id);
       setMessages(c.messages);
-      setModel(c.model);
+      setModel(
+        identity?.models.some((available) => available.id === c.model)
+          ? c.model
+          : (identity?.models[0]?.id ?? ""),
+      );
       setTemporary(false);
       setFiles([]);
       setText("");
