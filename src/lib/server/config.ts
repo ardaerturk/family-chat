@@ -25,13 +25,19 @@ export function models() {
   const configured = modelsSchema.parse(JSON.parse(env("AZURE_CHAT_MODELS")));
   return [
     {
-      id: "gpt-6.1-sol",
-      label: "GPT-6.1 Sol",
+      id: "gpt-6.2-sol",
+      label: "GPT-6.2 Sol",
       description: "Azure OpenAI · complex tasks",
       reasoning: true,
     },
+    {
+      id: "gpt-6.2-astra",
+      label: "GPT-6.2 Astra",
+      description: "Most capable · complex questions",
+      reasoning: true,
+    },
     ...configured.filter(
-      (model) => model.id !== "gpt-6-sol" && model.id !== "gpt-6.1-sol",
+      (model) => !/^gpt-6(?:\.[12])?-(?:sol|astra)$/.test(model.id),
     ),
   ];
 }
